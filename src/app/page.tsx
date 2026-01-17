@@ -1,10 +1,29 @@
+'use client'
+
+import { useState } from 'react'
+import { NodeCanvas, createInitialNodes } from '@/components/canvas/NodeCanvas'
+import { Inspector } from '@/components/ui/Inspector'
+import type { AppNode, AppEdge } from '@/types/nodes'
+
 export default function Home() {
+  const { nodes: initialNodes, edges: initialEdges } = createInitialNodes()
+  const [nodes, setNodes] = useState<AppNode[]>(initialNodes)
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <h1 className="text-4xl font-bold mb-4">SuperCraft Print</h1>
-      <p className="text-lg text-gray-400">
-        Printability Analysis &amp; Suggested Fixes
-      </p>
+    <main className="flex h-screen w-screen overflow-hidden">
+      {/* Node Graph Canvas */}
+      <div className="flex-1 h-full">
+        <NodeCanvas
+          initialNodes={initialNodes}
+          initialEdges={initialEdges}
+          onNodesChange={setNodes}
+        />
+      </div>
+
+      {/* Inspector Panel */}
+      <div className="w-80 h-full">
+        <Inspector nodes={nodes} />
+      </div>
     </main>
   )
 }
