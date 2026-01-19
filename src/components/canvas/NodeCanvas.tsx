@@ -138,7 +138,7 @@ export function createInitialNodes(): { nodes: AppNode[]; edges: AppEdge[] } {
       id: 'mesh-source-1',
       type: 'mesh-source',
       position: { x: 100, y: 100 },
-      data: { label: 'Mesh Source', status: 'idle', meshId: null, meshName: null },
+      data: { label: 'Mesh Source', status: 'idle', meshId: null, meshName: null, error: null },
     },
     {
       id: 'printability-report-1',

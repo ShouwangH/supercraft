@@ -25,6 +25,7 @@ export interface BaseNodeData {
 export interface MeshSourceNodeData extends BaseNodeData {
   meshId: string | null
   meshName: string | null
+  error: string | null
 }
 
 export interface PrintabilityReportNodeData extends BaseNodeData {
