@@ -14,7 +14,7 @@ import type {
   ReportStatus,
   IssueSeverity,
 } from '@/types/report'
-import { REPORT_SCHEMA_VERSION, DEFAULT_PRINTER_PROFILE } from '@/types/report'
+import { REPORT_SCHEMA_VERSION, DEFAULT_PRINTER_PROFILE, TOOL_VERSIONS } from '@/types/report'
 
 import { buildEdgeMap } from './edgeMap'
 import { checkWatertight } from './watertight'
@@ -238,6 +238,7 @@ export function generateReport(
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     createdAt: new Date().toISOString(),
+    toolVersions: TOOL_VERSIONS,
     meshStats,
     printerProfile: profile,
     status,

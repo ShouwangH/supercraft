@@ -36,6 +36,11 @@ describe('exportBundle', () => {
   const createMockReport = (issues: PrintabilityReport['issues'] = []): PrintabilityReport => ({
     schemaVersion: '1.0',
     createdAt: new Date().toISOString(),
+    toolVersions: {
+      app: '0.1.0',
+      three: '0.182.0',
+      reactFlow: '11.11.4',
+    },
     meshStats: {
       vertexCount: 100,
       triangleCount: 50,
