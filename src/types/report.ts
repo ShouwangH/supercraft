@@ -66,6 +66,10 @@ export interface MeshStats {
     max: [number, number, number]
     dimensions: [number, number, number]
   }
+  /** Whether the mesh was decimated for analysis */
+  analysisDecimated: boolean
+  /** Original triangle count before decimation (if decimated) */
+  originalTriangleCount?: number
 }
 
 /**
@@ -79,6 +83,8 @@ export interface PrinterProfile {
   maxPrintDimensionMm: number
   /** Floater threshold as percentage of total faces */
   floaterThresholdPercent: number
+  /** Maximum triangles for analysis - larger meshes will be decimated */
+  maxTrianglesForAnalysis: number
 }
 
 /**
@@ -89,6 +95,7 @@ export const DEFAULT_PRINTER_PROFILE: PrinterProfile = {
   overhangThresholdDeg: 45,
   maxPrintDimensionMm: 300,
   floaterThresholdPercent: 5,
+  maxTrianglesForAnalysis: 200000,
 }
 
 /**

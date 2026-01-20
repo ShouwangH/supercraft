@@ -105,6 +105,14 @@ export interface FixResult {
     verticesAdded?: number
     /** Components removed */
     componentsRemoved?: number
+    /** Number of holes filled (for watertight remesh) */
+    holesFilled?: number
+    /** Number of holes skipped due to size (for watertight remesh) */
+    holesSkipped?: number
+    /** Boundary edges before repair */
+    boundaryEdgesBefore?: number
+    /** Boundary edges after repair */
+    boundaryEdgesAfter?: number
   }
 }
 

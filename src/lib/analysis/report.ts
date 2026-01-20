@@ -22,6 +22,7 @@ import { checkNonManifold } from './nonManifold'
 import { findConnectedComponents } from './components'
 import { analyzeOverhang } from './overhang'
 import { checkScale } from './scale'
+import { decimateForAnalysis } from './decimation'
 
 /**
  * Results from all analysis checks
@@ -199,18 +200,28 @@ function createOverlayData(results: AnalysisResults): OverlayData {
 /**
  * Creates mesh statistics
  */
-function createMeshStats(mesh: MeshData, results: AnalysisResults): MeshStats {
+function createMeshStats(
+  originalMesh: MeshData,
+  results: AnalysisResults,
+  wasDecimated: boolean,
+  originalTriangleCount: number
+): MeshStats {
   return {
-    vertexCount: mesh.vertexCount,
-    triangleCount: mesh.triangleCount,
+    vertexCount: originalMesh.vertexCount,
+    triangleCount: originalMesh.triangleCount,
     edgeCount: results.edgeCount,
     componentCount: results.components.componentCount,
-    boundingBox: mesh.boundingBox,
+    boundingBox: originalMesh.boundingBox,
+    analysisDecimated: wasDecimated,
+    originalTriangleCount: wasDecimated ? originalTriangleCount : undefined,
   }
 }
 
 /**
  * Generates a complete printability report for a mesh.
+ *
+ * If the mesh exceeds maxTrianglesForAnalysis, it will be decimated
+ * for analysis purposes only. The original mesh stats are preserved.
  *
  * @param mesh - The mesh data to analyze
  * @param profile - Printer profile with analysis settings (defaults to DEFAULT_PRINTER_PROFILE)
@@ -220,8 +231,12 @@ export function generateReport(
   mesh: MeshData,
   profile: PrinterProfile = DEFAULT_PRINTER_PROFILE
 ): PrintabilityReport {
-  // Run all analysis
-  const results = runAllAnalysis(mesh, profile)
+  // Decimate mesh if necessary for analysis
+  const decimationResult = decimateForAnalysis(mesh, profile.maxTrianglesForAnalysis)
+  const analysisTarget = decimationResult.mesh
+
+  // Run all analysis on (potentially decimated) mesh
+  const results = runAllAnalysis(analysisTarget, profile)
 
   // Generate issues
   const issues = generateIssues(results)
@@ -229,8 +244,13 @@ export function generateReport(
   // Determine status
   const status = determineStatus(issues)
 
-  // Create mesh stats
-  const meshStats = createMeshStats(mesh, results)
+  // Create mesh stats (using original mesh dimensions)
+  const meshStats = createMeshStats(
+    mesh,
+    results,
+    decimationResult.wasDecimated,
+    decimationResult.originalTriangleCount
+  )
 
   // Create overlay data
   const overlayData = createOverlayData(results)

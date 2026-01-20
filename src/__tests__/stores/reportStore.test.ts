@@ -22,6 +22,7 @@ function createMockReport(overrides: Partial<PrintabilityReport> = {}): Printabi
         max: [10, 10, 10],
         dimensions: [10, 10, 10],
       },
+      analysisDecimated: false,
     },
     printerProfile: {
       name: 'Default FDM',

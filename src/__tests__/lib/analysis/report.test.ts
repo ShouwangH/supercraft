@@ -278,6 +278,92 @@ describe('report', () => {
     })
   })
 
+  describe('decimation integration', () => {
+    it('should set analysisDecimated to false for small mesh', () => {
+      const mesh = createClosedCubeMesh()
+      const report = generateReport(mesh)
+
+      expect(report.meshStats.analysisDecimated).toBe(false)
+      expect(report.meshStats.originalTriangleCount).toBeUndefined()
+    })
+
+    it('should set analysisDecimated to true for large mesh', () => {
+      // Create a large mesh that exceeds the threshold
+      const largePositions = new Float32Array(1000 * 3 * 3) // 1000 triangles
+      const largeIndices = new Uint32Array(1000 * 3)
+      for (let i = 0; i < 1000; i++) {
+        const baseVertex = i * 3
+        largeIndices[i * 3] = baseVertex
+        largeIndices[i * 3 + 1] = baseVertex + 1
+        largeIndices[i * 3 + 2] = baseVertex + 2
+      }
+
+      const largeMesh = {
+        id: 'large-mesh',
+        name: 'Large Mesh',
+        positions: largePositions,
+        indices: largeIndices,
+        normals: new Float32Array(largePositions.length),
+        vertexCount: 3000,
+        triangleCount: 1000,
+        boundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [100, 100, 100] as [number, number, number],
+          dimensions: [100, 100, 100] as [number, number, number],
+        },
+      }
+
+      // Use a very low threshold to trigger decimation
+      const customProfile = {
+        ...DEFAULT_PRINTER_PROFILE,
+        maxTrianglesForAnalysis: 100,
+      }
+
+      const report = generateReport(largeMesh, customProfile)
+
+      expect(report.meshStats.analysisDecimated).toBe(true)
+      expect(report.meshStats.originalTriangleCount).toBe(1000)
+    })
+
+    it('should preserve original mesh stats even when decimated', () => {
+      // Create a mesh larger than threshold
+      const positions = new Float32Array(500 * 3 * 3)
+      const indices = new Uint32Array(500 * 3)
+      for (let i = 0; i < 500; i++) {
+        indices[i * 3] = i * 3
+        indices[i * 3 + 1] = i * 3 + 1
+        indices[i * 3 + 2] = i * 3 + 2
+      }
+
+      const mesh = {
+        id: 'medium-mesh',
+        name: 'Medium Mesh',
+        positions,
+        indices,
+        normals: new Float32Array(positions.length),
+        vertexCount: 1500,
+        triangleCount: 500,
+        boundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [50, 50, 50] as [number, number, number],
+          dimensions: [50, 50, 50] as [number, number, number],
+        },
+      }
+
+      const customProfile = {
+        ...DEFAULT_PRINTER_PROFILE,
+        maxTrianglesForAnalysis: 100,
+      }
+
+      const report = generateReport(mesh, customProfile)
+
+      // Original mesh stats should be preserved
+      expect(report.meshStats.vertexCount).toBe(1500)
+      expect(report.meshStats.triangleCount).toBe(500)
+      expect(report.meshStats.boundingBox).toEqual(mesh.boundingBox)
+    })
+  })
+
   describe('runAllAnalysis', () => {
     it('returns results from all analysis checks', () => {
       const mesh = createClosedCubeMesh()
