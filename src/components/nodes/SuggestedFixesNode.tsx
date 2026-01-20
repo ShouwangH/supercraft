@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { NodeProps } from 'reactflow'
 import { useReactFlow, useEdges } from 'reactflow'
 import type { SuggestedFixesNodeData, MeshSourceNodeData } from '@/types/nodes'
@@ -29,7 +29,24 @@ function getRiskColor(risk: FixRisk): string {
 }
 
 /**
- * Fix recipe card component
+ * Risk badge component
+ */
+function RiskBadge({ risk }: { risk: FixRisk }) {
+  const bgColor = {
+    LOW: 'bg-emerald-900/50 border-emerald-600',
+    MEDIUM: 'bg-amber-900/50 border-amber-600',
+    HIGH: 'bg-red-900/50 border-red-600',
+  }[risk]
+
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${bgColor} ${getRiskColor(risk)}`}>
+      {risk}
+    </span>
+  )
+}
+
+/**
+ * Fix recipe card component with destructive warning
  */
 function RecipeCard({
   recipe,
@@ -40,36 +57,90 @@ function RecipeCard({
   isApplying: boolean
   onApply: () => void
 }) {
-  const canApply = recipe.implemented && !isApplying
+  const [confirmed, setConfirmed] = useState(false)
+  const isHighRisk = recipe.risk === 'HIGH'
+  const canApply = recipe.implemented && !isApplying && (!isHighRisk || confirmed)
 
   return (
-    <div className="p-2 bg-neutral-800 rounded border border-neutral-700 space-y-1">
-      <div className="flex items-center justify-between">
-        <span className={`text-xs font-medium ${getRiskColor(recipe.risk)}`}>
-          {recipe.risk} Risk
-        </span>
+    <div className={`p-2.5 rounded-lg border space-y-2 transition-colors ${
+      isHighRisk
+        ? 'bg-red-950/30 border-red-800/50'
+        : 'bg-neutral-800/50 border-neutral-700/50'
+    }`}>
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <RiskBadge risk={recipe.risk} />
+          {recipe.shapeImpact !== 'NONE' && (
+            <span className="text-[9px] text-gray-500 uppercase">
+              {recipe.shapeImpact} impact
+            </span>
+          )}
+        </div>
         {recipe.implemented ? (
           <button
             onClick={onApply}
             disabled={!canApply}
-            className={`text-[10px] px-1.5 py-0.5 rounded ${
+            className={`text-[10px] px-2 py-1 rounded-md font-medium transition-colors ${
               canApply
-                ? 'bg-purple-600 text-white hover:bg-purple-500'
+                ? isHighRisk
+                  ? 'bg-red-600 text-white hover:bg-red-500'
+                  : 'bg-purple-600 text-white hover:bg-purple-500'
                 : 'bg-neutral-700 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {isApplying ? 'Applying...' : 'Apply'}
+            {isApplying ? 'Applying...' : 'Apply Fix'}
           </button>
         ) : (
-          <span className="text-[10px] text-gray-500">Advisory</span>
+          <span className="text-[10px] px-2 py-1 bg-neutral-700/50 rounded-md text-gray-400">
+            Advisory Only
+          </span>
         )}
       </div>
-      <div className="text-xs font-medium text-gray-200">{recipe.title}</div>
-      <div className="text-[10px] text-gray-400">{recipe.description}</div>
+
+      {/* Title and description */}
+      <div>
+        <div className="text-xs font-semibold text-gray-200">{recipe.title}</div>
+        <div className="text-[11px] text-gray-400 mt-0.5">{recipe.description}</div>
+      </div>
+
+      {/* Expected effect */}
+      <div className="text-[10px] text-gray-500">
+        <span className="text-gray-400">Effect:</span> {recipe.expectedEffect}
+      </div>
+
+      {/* Warnings */}
       {recipe.warnings.length > 0 && (
-        <div className="text-[10px] text-yellow-500 italic">
-          ⚠ {recipe.warnings[0]}
+        <div className={`text-[10px] p-2 rounded ${
+          isHighRisk ? 'bg-red-950/50' : 'bg-amber-950/30'
+        }`}>
+          <div className={`font-medium mb-1 ${isHighRisk ? 'text-red-400' : 'text-amber-400'}`}>
+            {isHighRisk ? '⚠️ Destructive Operation' : '⚠️ Warnings'}
+          </div>
+          <ul className={`space-y-0.5 ${isHighRisk ? 'text-red-300/80' : 'text-amber-300/80'}`}>
+            {recipe.warnings.map((warning, i) => (
+              <li key={i} className="flex gap-1">
+                <span>•</span>
+                <span>{warning}</span>
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
+
+      {/* High-risk confirmation checkbox */}
+      {isHighRisk && recipe.implemented && (
+        <label className="flex items-start gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            className="mt-0.5 w-3.5 h-3.5 rounded border-red-600 bg-red-950 text-red-500 focus:ring-red-500 focus:ring-offset-neutral-900"
+          />
+          <span className="text-[10px] text-red-300">
+            I understand this operation is destructive and may significantly alter the mesh
+          </span>
+        </label>
       )}
     </div>
   )
@@ -246,7 +317,7 @@ export function SuggestedFixesNode({ id, data, selected }: NodeProps<SuggestedFi
       selected={selected}
       onRun={handleRun}
     >
-      <div className="space-y-2 max-w-[220px]">
+      <div className="space-y-2 max-w-[280px]">
         {/* Status message */}
         {!connectedMeshId && (
           <div className="text-xs text-gray-400">Connect mesh to generate fixes</div>

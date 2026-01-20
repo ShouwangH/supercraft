@@ -10,6 +10,7 @@ describe('viewerStore', () => {
       wireframe: false,
       overlayMode: 'none',
       overlayOpacity: 0.8,
+      screenshotCallback: null,
     })
   })
 
@@ -159,6 +160,47 @@ describe('viewerStore', () => {
       useViewerStore.setState({ overlayMode: 'boundary_edges' })
       useViewerStore.getState().clearOverlay()
       expect(useViewerStore.getState().overlayMode).toBe('none')
+    })
+  })
+
+  describe('screenshot callback', () => {
+    it('has no screenshot callback by default', () => {
+      expect(useViewerStore.getState().screenshotCallback).toBeNull()
+    })
+
+    it('registers a screenshot callback', () => {
+      const callback = () => 'data:image/png;base64,test'
+      useViewerStore.getState().registerScreenshotCallback(callback)
+      expect(useViewerStore.getState().screenshotCallback).toBe(callback)
+    })
+
+    it('unregisters the screenshot callback', () => {
+      const callback = () => 'data:image/png;base64,test'
+      useViewerStore.getState().registerScreenshotCallback(callback)
+      useViewerStore.getState().unregisterScreenshotCallback()
+      expect(useViewerStore.getState().screenshotCallback).toBeNull()
+    })
+
+    it('captures screenshot when callback is registered', () => {
+      const expectedDataUrl = 'data:image/png;base64,test123'
+      const callback = () => expectedDataUrl
+      useViewerStore.getState().registerScreenshotCallback(callback)
+
+      const result = useViewerStore.getState().captureScreenshot()
+      expect(result).toBe(expectedDataUrl)
+    })
+
+    it('returns null when no callback is registered', () => {
+      const result = useViewerStore.getState().captureScreenshot()
+      expect(result).toBeNull()
+    })
+
+    it('can capture screenshot that returns null', () => {
+      const callback = () => null
+      useViewerStore.getState().registerScreenshotCallback(callback)
+
+      const result = useViewerStore.getState().captureScreenshot()
+      expect(result).toBeNull()
     })
   })
 })
