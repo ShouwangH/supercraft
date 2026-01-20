@@ -8,6 +8,7 @@ import { BaseNode } from './BaseNode'
 import { meshSourceDefinition } from '@/lib/nodes/registry'
 import { loadMeshFile, getAcceptedExtensions } from '@/lib/loaders/meshLoader'
 import { useMeshStore } from '@/stores/meshStore'
+import { getSampleDefinitions, generateSampleMesh } from '@/lib/samples/generateSamples'
 
 export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeData>) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -72,6 +73,55 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
     fileInputRef.current?.click()
   }, [])
 
+  const handleSampleSelect = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const sampleId = event.target.value
+      if (!sampleId) return
+
+      // Set loading state
+      updateNodeData({ status: 'running', error: null })
+
+      try {
+        const meshData = generateSampleMesh(sampleId)
+
+        if (!meshData) {
+          throw new Error(`Unknown sample: ${sampleId}`)
+        }
+
+        // Generate unique ID for this instance
+        const uniqueMesh = {
+          ...meshData,
+          id: `${meshData.id}-${id}-${Date.now()}`,
+        }
+
+        // Add mesh to store
+        addMesh(uniqueMesh)
+
+        // Update node data
+        updateNodeData({
+          status: 'pass',
+          meshId: uniqueMesh.id,
+          meshName: meshData.name,
+          error: null,
+        })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load sample'
+        updateNodeData({
+          status: 'error',
+          meshId: null,
+          meshName: null,
+          error: errorMessage,
+        })
+      }
+
+      // Reset select
+      event.target.value = ''
+    },
+    [id, updateNodeData, addMesh]
+  )
+
+  const sampleDefinitions = getSampleDefinitions()
+
   return (
     <BaseNode
       label={data.label}
@@ -99,13 +149,20 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
         </button>
 
         <select
-          className="w-full px-2 py-1 text-xs bg-neutral-700 rounded"
-          disabled
+          className="w-full px-2 py-1 text-xs bg-neutral-700 rounded cursor-pointer"
+          onChange={handleSampleSelect}
+          disabled={data.status === 'running'}
           defaultValue=""
+          data-testid="sample-mesh-select"
         >
           <option value="" disabled>
-            Sample meshes (coming soon)
+            Load sample mesh...
           </option>
+          {sampleDefinitions.map((sample) => (
+            <option key={sample.id} value={sample.id}>
+              {sample.name}
+            </option>
+          ))}
         </select>
 
         <div className="text-xs">
