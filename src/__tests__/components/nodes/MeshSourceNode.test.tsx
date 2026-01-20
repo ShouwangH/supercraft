@@ -139,14 +139,39 @@ describe('MeshSourceNode', () => {
     expect(fileInput.getAttribute('accept')).toContain('.obj')
   })
 
-  it('renders sample meshes dropdown (disabled placeholder)', () => {
+  it('renders sample meshes dropdown with options', () => {
     render(
       <TestWrapper>
         <MeshSourceNode {...defaultProps} />
       </TestWrapper>
     )
 
-    const select = screen.getByRole('combobox')
+    const select = screen.getByTestId('sample-mesh-select')
+    expect(select).not.toBeDisabled()
+
+    // Check that sample mesh options are present
+    expect(screen.getByText('Load sample mesh...')).toBeInTheDocument()
+    expect(screen.getByText('Open Shell')).toBeInTheDocument()
+    expect(screen.getByText('Floaters')).toBeInTheDocument()
+    expect(screen.getByText('Non-manifold')).toBeInTheDocument()
+  })
+
+  it('disables sample dropdown when status is running', () => {
+    const propsLoading = {
+      ...defaultProps,
+      data: {
+        ...defaultProps.data,
+        status: 'running' as const,
+      },
+    }
+
+    render(
+      <TestWrapper>
+        <MeshSourceNode {...propsLoading} />
+      </TestWrapper>
+    )
+
+    const select = screen.getByTestId('sample-mesh-select')
     expect(select).toBeDisabled()
   })
 })
