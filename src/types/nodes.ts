@@ -40,7 +40,16 @@ export interface PrintabilityReportNodeData extends BaseNodeData {
 }
 
 export interface SuggestedFixesNodeData extends BaseNodeData {
+  /** Mesh ID from connected MeshSource node */
+  meshId: string | null
+  /** Fix plan ID (same as meshId when plan exists) */
   fixPlanId: string | null
+  /** Whether fix plan generation is in progress */
+  generating: boolean
+  /** Whether a fix is being applied */
+  applyingFix: string | null
+  /** Error message */
+  error: string | null
 }
 
 export type AppNodeData = MeshSourceNodeData | PrintabilityReportNodeData | SuggestedFixesNodeData
