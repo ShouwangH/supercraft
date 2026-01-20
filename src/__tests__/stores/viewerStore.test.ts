@@ -8,6 +8,8 @@ describe('viewerStore', () => {
       showGrid: true,
       showAxes: false,
       wireframe: false,
+      overlayMode: 'none',
+      overlayOpacity: 0.8,
     })
   })
 
@@ -100,6 +102,63 @@ describe('viewerStore', () => {
       useViewerStore.setState({ wireframe: true })
       useViewerStore.getState().toggleWireframe()
       expect(useViewerStore.getState().wireframe).toBe(false)
+    })
+  })
+
+  describe('overlay state', () => {
+    it('has no overlay by default', () => {
+      expect(useViewerStore.getState().overlayMode).toBe('none')
+    })
+
+    it('has default opacity of 0.8', () => {
+      expect(useViewerStore.getState().overlayOpacity).toBe(0.8)
+    })
+  })
+
+  describe('setOverlayMode', () => {
+    it('sets overlay mode to boundary_edges', () => {
+      useViewerStore.getState().setOverlayMode('boundary_edges')
+      expect(useViewerStore.getState().overlayMode).toBe('boundary_edges')
+    })
+
+    it('sets overlay mode to non_manifold_edges', () => {
+      useViewerStore.getState().setOverlayMode('non_manifold_edges')
+      expect(useViewerStore.getState().overlayMode).toBe('non_manifold_edges')
+    })
+
+    it('sets overlay mode to components', () => {
+      useViewerStore.getState().setOverlayMode('components')
+      expect(useViewerStore.getState().overlayMode).toBe('components')
+    })
+
+    it('sets overlay mode to overhang', () => {
+      useViewerStore.getState().setOverlayMode('overhang')
+      expect(useViewerStore.getState().overlayMode).toBe('overhang')
+    })
+  })
+
+  describe('setOverlayOpacity', () => {
+    it('sets opacity within valid range', () => {
+      useViewerStore.getState().setOverlayOpacity(0.5)
+      expect(useViewerStore.getState().overlayOpacity).toBe(0.5)
+    })
+
+    it('clamps opacity to minimum 0', () => {
+      useViewerStore.getState().setOverlayOpacity(-0.5)
+      expect(useViewerStore.getState().overlayOpacity).toBe(0)
+    })
+
+    it('clamps opacity to maximum 1', () => {
+      useViewerStore.getState().setOverlayOpacity(1.5)
+      expect(useViewerStore.getState().overlayOpacity).toBe(1)
+    })
+  })
+
+  describe('clearOverlay', () => {
+    it('resets overlay mode to none', () => {
+      useViewerStore.setState({ overlayMode: 'boundary_edges' })
+      useViewerStore.getState().clearOverlay()
+      expect(useViewerStore.getState().overlayMode).toBe('none')
     })
   })
 })
