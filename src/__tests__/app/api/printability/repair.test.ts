@@ -262,19 +262,46 @@ describe('POST /api/printability/repair', () => {
   })
 
   describe('watertight_remesh recipe', () => {
-    it('should return 501 for watertight_remesh (not implemented)', async () => {
+    it('should process watertight_remesh successfully', async () => {
+      // Create an open mesh (missing one face to create boundary edges)
+      const openMesh = {
+        positions: [
+          0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, // Front face vertices
+          0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, // Back face vertices
+        ],
+        indices: [
+          0, 1, 2, 0, 2, 3, // Front face
+          4, 6, 5, 4, 7, 6, // Back face
+          0, 4, 5, 0, 5, 1, // Bottom face
+          2, 6, 7, 2, 7, 3, // Top face (missing left/right to create holes)
+        ],
+      }
+
       const response = await POST(
         createMockRequest({
-          mesh: simpleMesh,
+          mesh: openMesh,
           recipeId: 'test-remesh',
           recipeType: 'watertight_remesh',
         })
       )
 
-      expect(response.status).toBe(501)
+      expect(response.status).toBe(200)
       const data: RepairResponse = await response.json()
-      expect(data.success).toBe(false)
-      expect(data.error).toContain('not implemented')
+      expect(data.success).toBe(true)
+      expect(data.result?.stats).toBeDefined()
+    })
+
+    it('should accept maxHoleSize option', async () => {
+      const response = await POST(
+        createMockRequest({
+          mesh: simpleMesh,
+          recipeId: 'test-remesh',
+          recipeType: 'watertight_remesh',
+          params: { maxHoleSize: 50 },
+        })
+      )
+
+      expect(response.status).toBe(200)
     })
   })
 

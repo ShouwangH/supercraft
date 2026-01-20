@@ -97,7 +97,7 @@ function createAutoOrientRecipe(issue: Issue): FixRecipe {
 }
 
 /**
- * Generates a fix recipe for watertight remesh (advisory only)
+ * Generates a fix recipe for watertight remesh
  */
 function createWatertightRemeshRecipe(issues: Issue[]): FixRecipe {
   const targetIssues = issues.map((i) => i.id)
@@ -106,23 +106,22 @@ function createWatertightRemeshRecipe(issues: Issue[]): FixRecipe {
   return {
     id: `fix-remesh-${Date.now()}`,
     type: 'watertight_remesh',
-    title: 'Watertight Remesh',
-    description: `Close ${boundaryEdgeCount} boundary edge${boundaryEdgeCount !== 1 ? 's' : ''} using voxel remesh.`,
+    title: 'Fill Holes (Watertight)',
+    description: `Fill holes to close ${boundaryEdgeCount} boundary edge${boundaryEdgeCount !== 1 ? 's' : ''}.`,
     targetIssues,
     risk: 'HIGH',
     shapeImpact: 'GLOBAL',
     deterministic: true,
-    implemented: false, // Not implemented in MVP
+    implemented: true,
     steps: [
-      { op: 'voxel_remesh', params: { resolution: 128 } },
-      { op: 'smooth', params: { iterations: 2 } },
+      { op: 'fill_holes', params: { maxHoleSize: 100 } },
     ],
     warnings: [
-      'DESTRUCTIVE: May soften edges, close vents, and change dimensions.',
-      'Use for prototypes only. Validate fits after remesh.',
-      'Not implemented in demo - use external tools like Blender or Netfabb.',
+      'DESTRUCTIVE: May close intentional vents or openings.',
+      'Adds triangles to fill holes - verify appearance after.',
+      'Use for prototypes only. Validate fits after operation.',
     ],
-    expectedEffect: 'Creates watertight mesh by filling holes and smoothing.',
+    expectedEffect: 'Creates watertight mesh by filling holes with fan triangulation.',
   }
 }
 
@@ -174,13 +173,11 @@ export function generateFixPlan(
     recommended.push(createMeshCleanupRecipe(report.issues))
   }
 
-  // Check for watertight issues (boundary edges, non-manifold)
-  const watertightIssues = report.issues.filter(
-    (i) => i.type === 'boundary_edges' || i.type === 'non_manifold_edges'
-  )
-  if (watertightIssues.length > 0) {
-    // Watertight remesh is advisory only (not implemented)
-    advisory.push(createWatertightRemeshRecipe(watertightIssues))
+  // Check for watertight issues (boundary edges only - non-manifold needs different handling)
+  const boundaryIssues = report.issues.filter((i) => i.type === 'boundary_edges')
+  if (boundaryIssues.length > 0) {
+    // Watertight remesh is now implemented - add to recommended
+    recommended.push(createWatertightRemeshRecipe(boundaryIssues))
   }
 
   return {

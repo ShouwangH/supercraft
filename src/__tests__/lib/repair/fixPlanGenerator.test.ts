@@ -132,7 +132,7 @@ describe('fixPlanGenerator', () => {
   })
 
   describe('watertight remesh recipe', () => {
-    it('should generate watertight remesh as advisory for boundary edges', () => {
+    it('should generate watertight remesh as recommended for boundary edges', () => {
       const report = createBaseReport({
         issues: [
           {
@@ -147,14 +147,14 @@ describe('fixPlanGenerator', () => {
 
       const plan = generateFixPlan(report, 'test-mesh')
 
-      const remeshRecipe = plan.advisory.find((r) => r.type === 'watertight_remesh')
+      const remeshRecipe = plan.recommended.find((r) => r.type === 'watertight_remesh')
       expect(remeshRecipe).toBeDefined()
-      expect(remeshRecipe?.implemented).toBe(false) // Not implemented
+      expect(remeshRecipe?.implemented).toBe(true)
       expect(remeshRecipe?.risk).toBe('HIGH')
       expect(remeshRecipe?.description).toContain('12')
     })
 
-    it('should generate watertight remesh for non-manifold edges', () => {
+    it('should not generate watertight remesh for non-manifold edges only', () => {
       const report = createBaseReport({
         issues: [
           {
@@ -168,8 +168,9 @@ describe('fixPlanGenerator', () => {
 
       const plan = generateFixPlan(report, 'test-mesh')
 
-      const remeshRecipe = plan.advisory.find((r) => r.type === 'watertight_remesh')
-      expect(remeshRecipe).toBeDefined()
+      // Watertight remesh only handles boundary edges, not non-manifold
+      const remeshRecipe = plan.recommended.find((r) => r.type === 'watertight_remesh')
+      expect(remeshRecipe).toBeUndefined()
     })
   })
 
@@ -205,7 +206,7 @@ describe('fixPlanGenerator', () => {
       expect(plan.recommended[0]?.risk).toBe('LOW')
     })
 
-    it('should place HIGH risk recipes in advisory', () => {
+    it('should place HIGH risk recipes last in recommended', () => {
       const report = createBaseReport({
         issues: [
           {
@@ -220,9 +221,14 @@ describe('fixPlanGenerator', () => {
 
       const plan = generateFixPlan(report, 'test-mesh')
 
-      // Advisory should have HIGH risk watertight remesh
-      const hasHighRisk = plan.advisory.some((r) => r.risk === 'HIGH')
+      // Recommended should have HIGH risk watertight remesh (sorted last)
+      const hasHighRisk = plan.recommended.some((r) => r.risk === 'HIGH')
       expect(hasHighRisk).toBe(true)
+
+      // HIGH risk should be last
+      const highRiskRecipe = plan.recommended.find((r) => r.risk === 'HIGH')
+      const lastRecipe = plan.recommended[plan.recommended.length - 1]
+      expect(lastRecipe?.risk).toBe('HIGH')
     })
   })
 
@@ -353,8 +359,8 @@ describe('fixPlanGenerator', () => {
       // Should have mesh cleanup
       expect(plan.recommended.some((r) => r.type === 'mesh_cleanup')).toBe(true)
 
-      // Should have watertight remesh in advisory
-      expect(plan.advisory.some((r) => r.type === 'watertight_remesh')).toBe(true)
+      // Should have watertight remesh in recommended (now implemented)
+      expect(plan.recommended.some((r) => r.type === 'watertight_remesh')).toBe(true)
     })
   })
 })
