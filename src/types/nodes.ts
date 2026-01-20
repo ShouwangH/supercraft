@@ -29,7 +29,14 @@ export interface MeshSourceNodeData extends BaseNodeData {
 }
 
 export interface PrintabilityReportNodeData extends BaseNodeData {
+  /** Mesh ID from connected MeshSource node */
+  meshId: string | null
+  /** Report ID (same as meshId when report exists) */
   reportId: string | null
+  /** Whether analysis is in progress */
+  analyzing: boolean
+  /** Error message if analysis failed */
+  error: string | null
 }
 
 export interface SuggestedFixesNodeData extends BaseNodeData {
