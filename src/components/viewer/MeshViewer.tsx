@@ -4,9 +4,29 @@ import { useEffect, useRef, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useViewerStore } from '@/stores/viewerStore'
+import { useMeshStore } from '@/stores/meshStore'
+import type { MeshData } from '@/types/mesh'
 
 interface MeshViewerProps {
   className?: string
+}
+
+/**
+ * Creates a THREE.BufferGeometry from MeshData
+ */
+function createGeometryFromMeshData(meshData: MeshData): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry()
+
+  geometry.setAttribute('position', new THREE.BufferAttribute(meshData.positions, 3))
+  geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1))
+
+  if (meshData.normals) {
+    geometry.setAttribute('normal', new THREE.BufferAttribute(meshData.normals, 3))
+  } else {
+    geometry.computeVertexNormals()
+  }
+
+  return geometry
 }
 
 export function MeshViewer({ className = '' }: MeshViewerProps) {
@@ -21,6 +41,10 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
   const frameIdRef = useRef<number>(0)
 
   const { showGrid, showAxes, wireframe } = useViewerStore()
+  const activeMesh = useMeshStore((state) => {
+    const activeMeshId = state.activeMeshId
+    return activeMeshId ? state.meshes[activeMeshId] : undefined
+  })
 
   // Initialize Three.js scene
   const initScene = useCallback(() => {
@@ -94,7 +118,7 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
     scene.add(axes)
     axesRef.current = axes
 
-    // Placeholder cube
+    // Placeholder cube (will be replaced when mesh is loaded)
     const geometry = new THREE.BoxGeometry(1, 1, 1)
     const material = new THREE.MeshStandardMaterial({
       color: 0x4a9eff,
@@ -180,6 +204,59 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
       material.wireframe = wireframe
     }
   }, [wireframe])
+
+  // Update mesh when active mesh changes
+  useEffect(() => {
+    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return
+
+    // Remove existing mesh
+    if (meshRef.current) {
+      sceneRef.current.remove(meshRef.current)
+      meshRef.current.geometry.dispose()
+      if (Array.isArray(meshRef.current.material)) {
+        meshRef.current.material.forEach((m) => m.dispose())
+      } else {
+        meshRef.current.material.dispose()
+      }
+      meshRef.current = null
+    }
+
+    // Create new mesh from active mesh data or show placeholder
+    const geometry = activeMesh
+      ? createGeometryFromMeshData(activeMesh)
+      : new THREE.BoxGeometry(1, 1, 1)
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x4a9eff,
+      wireframe: wireframe,
+    })
+
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+
+    if (activeMesh) {
+      // Center the mesh based on bounding box
+      const { min, max, dimensions } = activeMesh.boundingBox
+      const centerX = (min[0] + max[0]) / 2
+      const centerY = (min[1] + max[1]) / 2
+      const centerZ = (min[2] + max[2]) / 2
+      mesh.position.set(-centerX, -centerY, -centerZ)
+
+      // Adjust camera to fit the mesh
+      const maxDim = Math.max(...dimensions)
+      const distance = maxDim * 2
+      cameraRef.current.position.set(distance, distance, distance)
+      cameraRef.current.lookAt(0, 0, 0)
+      controlsRef.current.target.set(0, 0, 0)
+      controlsRef.current.update()
+    } else {
+      mesh.position.y = 0.5
+    }
+
+    sceneRef.current.add(mesh)
+    meshRef.current = mesh
+  }, [activeMesh, wireframe])
 
   return (
     <div
