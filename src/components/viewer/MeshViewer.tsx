@@ -250,7 +250,7 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
   const overlayRef = useRef<THREE.Object3D | null>(null)
   const frameIdRef = useRef<number>(0)
 
-  const { showGrid, showAxes, wireframe, overlayMode } = useViewerStore()
+  const { showGrid, showAxes, wireframe, overlayMode, registerScreenshotCallback, unregisterScreenshotCallback } = useViewerStore()
   const activeMesh = useMeshStore((state) => {
     const activeMeshId = state.activeMeshId
     return activeMeshId ? state.meshes[activeMeshId] : undefined
@@ -369,6 +369,16 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
     rendererRef.current.setSize(width, height)
   }, [])
 
+  // Screenshot capture callback
+  const captureScreenshot = useCallback((): string | null => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) {
+      return null
+    }
+    // Force a render before capturing
+    rendererRef.current.render(sceneRef.current, cameraRef.current)
+    return rendererRef.current.domElement.toDataURL('image/png')
+  }, [])
+
   // Initialize scene on mount
   useEffect(() => {
     initScene()
@@ -378,8 +388,15 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
       resizeObserver.observe(containerRef.current)
     }
 
+    // Register screenshot callback after scene is initialized
+    const timeoutId = setTimeout(() => {
+      registerScreenshotCallback(captureScreenshot)
+    }, 100)
+
     return () => {
       // Cleanup
+      clearTimeout(timeoutId)
+      unregisterScreenshotCallback()
       cancelAnimationFrame(frameIdRef.current)
       resizeObserver.disconnect()
 
@@ -396,7 +413,7 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
         controlsRef.current.dispose()
       }
     }
-  }, [initScene, handleResize])
+  }, [initScene, handleResize, captureScreenshot, registerScreenshotCallback, unregisterScreenshotCallback])
 
   // Update grid visibility
   useEffect(() => {

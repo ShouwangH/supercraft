@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { NodeProps } from 'reactflow'
 import { useReactFlow, useEdges } from 'reactflow'
 import type { PrintabilityReportNodeData, MeshSourceNodeData } from '@/types/nodes'
@@ -10,6 +10,14 @@ import { useMeshStore } from '@/stores/meshStore'
 import { useReportStore } from '@/stores/reportStore'
 import { useViewerStore, type OverlayMode } from '@/stores/viewerStore'
 import type { Issue } from '@/types/report'
+import {
+  downloadReportJson,
+  downloadScreenshot,
+  downloadExportBundle,
+  getRelevantOverlayModes,
+  type ExportBundle,
+  type ExportScreenshot,
+} from '@/lib/export'
 
 /**
  * Maps issue severity to CSS color class
@@ -90,7 +98,8 @@ export function PrintabilityReportNode({ id, data, selected }: NodeProps<Printab
   const edges = useEdges()
   const getMesh = useMeshStore((state) => state.getMesh)
   const { setReport, setAnalyzing, setError, getReport } = useReportStore()
-  const { overlayMode, setOverlayMode, clearOverlay } = useViewerStore()
+  const { overlayMode, setOverlayMode, clearOverlay, captureScreenshot } = useViewerStore()
+  const [isExporting, setIsExporting] = useState(false)
 
   // Find connected mesh source node
   const connectedMeshId = useMemo(() => {
@@ -194,6 +203,70 @@ export function PrintabilityReportNode({ id, data, selected }: NodeProps<Printab
     [overlayMode, setOverlayMode, clearOverlay]
   )
 
+  // Get mesh name for export
+  const meshName = useMemo(() => {
+    if (!connectedMeshId) return 'mesh'
+    const mesh = getMesh(connectedMeshId)
+    return mesh?.name || 'mesh'
+  }, [connectedMeshId, getMesh])
+
+  // Handle export report JSON
+  const handleExportJson = useCallback(() => {
+    if (!report) return
+    downloadReportJson(report, meshName)
+  }, [report, meshName])
+
+  // Handle export screenshot
+  const handleExportScreenshot = useCallback(() => {
+    const screenshot = captureScreenshot()
+    if (screenshot) {
+      const overlayName = overlayMode === 'none' ? 'base' : overlayMode
+      downloadScreenshot(screenshot, `${meshName}-${overlayName}`)
+    }
+  }, [captureScreenshot, meshName, overlayMode])
+
+  // Handle export full bundle
+  const handleExportBundle = useCallback(async () => {
+    if (!report) return
+
+    setIsExporting(true)
+
+    try {
+      const relevantModes = getRelevantOverlayModes(report)
+      const screenshots: ExportScreenshot[] = []
+
+      // Capture screenshots for each relevant overlay mode
+      const originalMode = overlayMode
+
+      for (const { mode, name } of relevantModes) {
+        setOverlayMode(mode)
+        // Small delay to let the overlay render
+        await new Promise((resolve) => setTimeout(resolve, 200))
+
+        const screenshot = captureScreenshot()
+        if (screenshot) {
+          screenshots.push({ name, dataUrl: screenshot })
+        }
+      }
+
+      // Restore original overlay mode
+      setOverlayMode(originalMode)
+
+      const bundle: ExportBundle = {
+        report,
+        screenshots,
+        meshName,
+        timestamp: new Date().toISOString(),
+      }
+
+      await downloadExportBundle(bundle)
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [report, meshName, overlayMode, setOverlayMode, captureScreenshot])
+
   return (
     <BaseNode
       label={data.label}
@@ -253,6 +326,39 @@ export function PrintabilityReportNode({ id, data, selected }: NodeProps<Printab
             ) : (
               <div className="text-xs text-green-400">No issues found</div>
             )}
+
+            {/* Export buttons */}
+            <div className="pt-2 mt-2 border-t border-neutral-700 space-y-1.5">
+              <div className="text-xs font-medium text-gray-300">Export</div>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={handleExportJson}
+                  className="text-[10px] px-2 py-1 rounded bg-neutral-700 text-gray-300 hover:bg-neutral-600 transition-colors"
+                  title="Download report JSON"
+                >
+                  JSON
+                </button>
+                <button
+                  onClick={handleExportScreenshot}
+                  className="text-[10px] px-2 py-1 rounded bg-neutral-700 text-gray-300 hover:bg-neutral-600 transition-colors"
+                  title="Download current view screenshot"
+                >
+                  Screenshot
+                </button>
+                <button
+                  onClick={handleExportBundle}
+                  disabled={isExporting}
+                  className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                    isExporting
+                      ? 'bg-neutral-600 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-500'
+                  }`}
+                  title="Download full export bundle with all screenshots"
+                >
+                  {isExporting ? 'Exporting...' : 'Full Bundle'}
+                </button>
+              </div>
+            </div>
           </>
         )}
       </div>

@@ -10,6 +10,9 @@ export type OverlayMode =
   | 'components'
   | 'overhang'
 
+/** Screenshot callback function type */
+export type ScreenshotCallback = () => string | null
+
 interface ViewerState {
   showGrid: boolean
   showAxes: boolean
@@ -18,6 +21,8 @@ interface ViewerState {
   overlayMode: OverlayMode
   /** Opacity for overlay rendering (0-1) */
   overlayOpacity: number
+  /** Registered screenshot callback from MeshViewer */
+  screenshotCallback: ScreenshotCallback | null
 
   setShowGrid: (show: boolean) => void
   setShowAxes: (show: boolean) => void
@@ -28,14 +33,21 @@ interface ViewerState {
   toggleAxes: () => void
   toggleWireframe: () => void
   clearOverlay: () => void
+  /** Register screenshot callback from viewer */
+  registerScreenshotCallback: (callback: ScreenshotCallback) => void
+  /** Unregister screenshot callback */
+  unregisterScreenshotCallback: () => void
+  /** Capture a screenshot (returns base64 data URL or null) */
+  captureScreenshot: () => string | null
 }
 
-export const useViewerStore = create<ViewerState>((set) => ({
+export const useViewerStore = create<ViewerState>((set, get) => ({
   showGrid: true,
   showAxes: false,
   wireframe: false,
   overlayMode: 'none',
   overlayOpacity: 0.8,
+  screenshotCallback: null,
 
   setShowGrid: (show) => set({ showGrid: show }),
   setShowAxes: (show) => set({ showAxes: show }),
@@ -46,4 +58,10 @@ export const useViewerStore = create<ViewerState>((set) => ({
   toggleAxes: () => set((state) => ({ showAxes: !state.showAxes })),
   toggleWireframe: () => set((state) => ({ wireframe: !state.wireframe })),
   clearOverlay: () => set({ overlayMode: 'none' }),
+  registerScreenshotCallback: (callback) => set({ screenshotCallback: callback }),
+  unregisterScreenshotCallback: () => set({ screenshotCallback: null }),
+  captureScreenshot: () => {
+    const callback = get().screenshotCallback
+    return callback ? callback() : null
+  },
 }))
