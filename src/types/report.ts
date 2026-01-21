@@ -6,6 +6,27 @@
 
 export const REPORT_SCHEMA_VERSION = '1.0'
 
+/**
+ * Tool versions embedded in the report for traceability
+ */
+export interface ToolVersions {
+  /** Application version */
+  app: string
+  /** Three.js version for rendering */
+  three: string
+  /** React Flow version for node graph */
+  reactFlow: string
+}
+
+/**
+ * Current tool versions - update when dependencies change
+ */
+export const TOOL_VERSIONS: ToolVersions = {
+  app: '0.1.0',
+  three: '0.182.0',
+  reactFlow: '11.11.4',
+}
+
 export type IssueSeverity = 'BLOCKER' | 'RISK' | 'INFO'
 
 export type IssueType =
@@ -96,6 +117,7 @@ export interface OverlayData {
 export interface PrintabilityReport {
   schemaVersion: string
   createdAt: string
+  toolVersions: ToolVersions
   meshStats: MeshStats
   printerProfile: PrinterProfile
   status: ReportStatus

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { generateReport, runAllAnalysis } from '@/lib/analysis/report'
 import type { MeshData } from '@/types/mesh'
-import { REPORT_SCHEMA_VERSION, DEFAULT_PRINTER_PROFILE } from '@/types/report'
+import { REPORT_SCHEMA_VERSION, DEFAULT_PRINTER_PROFILE, TOOL_VERSIONS } from '@/types/report'
 
 // Helper to create a valid closed cube mesh (10mm x 10mm x 10mm to avoid scale warnings)
 function createClosedCubeMesh(): MeshData {
@@ -159,6 +159,16 @@ describe('report', () => {
       expect(report.createdAt).toBeDefined()
       // Should be a valid ISO date string
       expect(() => new Date(report.createdAt)).not.toThrow()
+    })
+
+    it('includes tool versions for traceability', () => {
+      const mesh = createClosedCubeMesh()
+      const report = generateReport(mesh)
+
+      expect(report.toolVersions).toEqual(TOOL_VERSIONS)
+      expect(report.toolVersions.app).toBeDefined()
+      expect(report.toolVersions.three).toBeDefined()
+      expect(report.toolVersions.reactFlow).toBeDefined()
     })
 
     it('includes mesh stats', () => {
