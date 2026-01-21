@@ -157,7 +157,15 @@ export function createInitialNodes(): { nodes: AppNode[]; edges: AppEdge[] } {
       id: 'suggested-fixes-1',
       type: 'suggested-fixes',
       position: { x: 700, y: 100 },
-      data: { label: 'Suggested Fixes', status: 'idle', fixPlanId: null },
+      data: {
+        label: 'Suggested Fixes',
+        status: 'idle',
+        meshId: null,
+        fixPlanId: null,
+        generating: false,
+        applyingFix: null,
+        error: null,
+      },
     },
   ]
 
