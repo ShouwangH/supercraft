@@ -5,6 +5,7 @@ import type { RepairRequest, RepairResponse, FixOperationType } from '@/types/fi
 import { removeFloaters } from '@/lib/repair/removeFloaters'
 import { meshCleanup } from '@/lib/repair/meshCleanup'
 import { autoOrient } from '@/lib/repair/autoOrient'
+import { watertightRemesh } from '@/lib/repair/watertightRemesh'
 
 /**
  * Converts request mesh data to internal MeshData format
@@ -189,15 +190,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<RepairRes
       }
 
       case 'watertight_remesh': {
-        // Not implemented - return error with guidance
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Watertight remesh is not implemented in this demo. ' +
-              'Use external tools like Blender (Remesh modifier) or Netfabb for this operation.',
-          },
-          { status: 501 }
-        )
+        const remeshResult = watertightRemesh(meshData, {
+          maxHoleSize: (params?.maxHoleSize as number) ?? 100,
+        })
+        repairedMesh = remeshResult.mesh
+        result = remeshResult.result
+        break
       }
 
       default:
