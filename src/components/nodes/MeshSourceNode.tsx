@@ -8,7 +8,7 @@ import { BaseNode } from './BaseNode'
 import { meshSourceDefinition } from '@/lib/nodes/registry'
 import { loadMeshFile, getAcceptedExtensions } from '@/lib/loaders/meshLoader'
 import { useMeshStore } from '@/stores/meshStore'
-import { sampleMeshes, generateSampleMesh } from '@/lib/samples'
+import { getSampleDefinitions, generateSampleMesh } from '@/lib/samples/generateSamples'
 
 export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeData>) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -78,30 +78,30 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
       const sampleId = event.target.value
       if (!sampleId) return
 
-      // Reset the select after selection
-      event.target.value = ''
-
       // Set loading state
       updateNodeData({ status: 'running', error: null })
 
       try {
         const meshData = generateSampleMesh(sampleId)
+
         if (!meshData) {
-          throw new Error('Sample mesh not found')
+          throw new Error(`Unknown sample: ${sampleId}`)
         }
 
         // Generate unique ID for this instance
-        const meshId = `${meshData.id}-${id}-${Date.now()}`
-        const meshWithUniqueId = { ...meshData, id: meshId }
+        const uniqueMesh = {
+          ...meshData,
+          id: `${meshData.id}-${id}-${Date.now()}`,
+        }
 
         // Add mesh to store
-        addMesh(meshWithUniqueId)
+        addMesh(uniqueMesh)
 
         // Update node data
         updateNodeData({
           status: 'pass',
-          meshId: meshWithUniqueId.id,
-          meshName: meshWithUniqueId.name,
+          meshId: uniqueMesh.id,
+          meshName: meshData.name,
           error: null,
         })
       } catch (error) {
@@ -113,9 +113,14 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
           error: errorMessage,
         })
       }
+
+      // Reset select
+      event.target.value = ''
     },
     [id, updateNodeData, addMesh]
   )
+
+  const sampleDefinitions = getSampleDefinitions()
 
   return (
     <BaseNode
@@ -153,7 +158,7 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
           <option value="" disabled>
             Load sample mesh...
           </option>
-          {sampleMeshes.map((sample) => (
+          {sampleDefinitions.map((sample) => (
             <option key={sample.id} value={sample.id}>
               {sample.name}
             </option>

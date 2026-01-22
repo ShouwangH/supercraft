@@ -149,14 +149,13 @@ describe('MeshSourceNode', () => {
     const select = screen.getByTestId('sample-mesh-select')
     expect(select).not.toBeDisabled()
 
-    // Check that sample mesh options are present
-    expect(screen.getByText('Load sample mesh...')).toBeInTheDocument()
-    expect(screen.getByText('Open Shell')).toBeInTheDocument()
-    expect(screen.getByText('Floaters')).toBeInTheDocument()
-    expect(screen.getByText('Non-manifold')).toBeInTheDocument()
+    // Check that sample options are present
+    expect(screen.getByText('Open Shell (Device Enclosure)')).toBeInTheDocument()
+    expect(screen.getByText('Floaters (Messy Kitbash)')).toBeInTheDocument()
+    expect(screen.getByText('Non-Manifold (Bad Boolean)')).toBeInTheDocument()
   })
 
-  it('disables sample dropdown when status is running', () => {
+  it('disables sample dropdown when loading', () => {
     const propsLoading = {
       ...defaultProps,
       data: {
