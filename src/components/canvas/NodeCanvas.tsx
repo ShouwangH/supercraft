@@ -144,13 +144,28 @@ export function createInitialNodes(): { nodes: AppNode[]; edges: AppEdge[] } {
       id: 'printability-report-1',
       type: 'printability-report',
       position: { x: 400, y: 100 },
-      data: { label: 'Printability Report', status: 'idle', reportId: null },
+      data: {
+        label: 'Printability Report',
+        status: 'idle',
+        meshId: null,
+        reportId: null,
+        analyzing: false,
+        error: null,
+      },
     },
     {
       id: 'suggested-fixes-1',
       type: 'suggested-fixes',
       position: { x: 700, y: 100 },
-      data: { label: 'Suggested Fixes', status: 'idle', fixPlanId: null },
+      data: {
+        label: 'Suggested Fixes',
+        status: 'idle',
+        meshId: null,
+        fixPlanId: null,
+        generating: false,
+        applyingFix: null,
+        error: null,
+      },
     },
   ]
 

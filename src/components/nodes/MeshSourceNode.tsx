@@ -149,7 +149,7 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
         </button>
 
         <select
-          className="w-full px-2 py-1 text-xs bg-neutral-700 rounded cursor-pointer"
+          className="w-full px-2 py-1 text-xs bg-neutral-700 hover:bg-neutral-600 rounded cursor-pointer transition-colors disabled:cursor-not-allowed disabled:bg-neutral-800"
           onChange={handleSampleSelect}
           disabled={data.status === 'running'}
           defaultValue=""

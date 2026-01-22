@@ -29,11 +29,27 @@ export interface MeshSourceNodeData extends BaseNodeData {
 }
 
 export interface PrintabilityReportNodeData extends BaseNodeData {
+  /** Mesh ID from connected MeshSource node */
+  meshId: string | null
+  /** Report ID (same as meshId when report exists) */
   reportId: string | null
+  /** Whether analysis is in progress */
+  analyzing: boolean
+  /** Error message if analysis failed */
+  error: string | null
 }
 
 export interface SuggestedFixesNodeData extends BaseNodeData {
+  /** Mesh ID from connected MeshSource node */
+  meshId: string | null
+  /** Fix plan ID (same as meshId when plan exists) */
   fixPlanId: string | null
+  /** Whether fix plan generation is in progress */
+  generating: boolean
+  /** Whether a fix is being applied */
+  applyingFix: string | null
+  /** Error message */
+  error: string | null
 }
 
 export type AppNodeData = MeshSourceNodeData | PrintabilityReportNodeData | SuggestedFixesNodeData
