@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NodeProps } from 'reactflow'
 import { useReactFlow, useEdges } from 'reactflow'
-import type { SuggestedFixesNodeData, MeshSourceNodeData } from '@/types/nodes'
-import { BaseNode } from './BaseNode'
-import { suggestedFixesDefinition } from '@/lib/nodes/registry'
+import { Handle, Position } from 'reactflow'
+import type { SuggestedFixesNodeData, AppNode, AppEdge } from '@/types/nodes'
+import { NODE_TYPES } from '@/types/nodes'
 import { useMeshStore } from '@/stores/meshStore'
 import { useReportStore } from '@/stores/reportStore'
 import { useFixPlanStore } from '@/stores/fixPlanStore'
@@ -18,7 +18,7 @@ import type { FixRecipe, FixRisk } from '@/types/fixPlan'
 function getRiskColor(risk: FixRisk): string {
   switch (risk) {
     case 'LOW':
-      return 'text-green-400'
+      return 'text-blue-400'
     case 'MEDIUM':
       return 'text-yellow-400'
     case 'HIGH':
@@ -33,7 +33,7 @@ function getRiskColor(risk: FixRisk): string {
  */
 function RiskBadge({ risk }: { risk: FixRisk }) {
   const bgColor = {
-    LOW: 'bg-emerald-900/50 border-emerald-600',
+    LOW: 'bg-blue-900/50 border-blue-600',
     MEDIUM: 'bg-amber-900/50 border-amber-600',
     HIGH: 'bg-red-900/50 border-red-600',
   }[risk]
@@ -46,211 +46,228 @@ function RiskBadge({ risk }: { risk: FixRisk }) {
 }
 
 /**
- * Fix recipe card component with destructive warning
+ * Checklist item for a fix
  */
-function RecipeCard({
+function FixChecklistItem({
   recipe,
-  isApplying,
-  onApply,
+  checked,
+  onChange,
+  disabled,
 }: {
   recipe: FixRecipe
-  isApplying: boolean
-  onApply: () => void
+  checked: boolean
+  onChange: (checked: boolean) => void
+  disabled: boolean
 }) {
-  const [confirmed, setConfirmed] = useState(false)
   const isHighRisk = recipe.risk === 'HIGH'
-  const canApply = recipe.implemented && !isApplying && (!isHighRisk || confirmed)
 
   return (
-    <div className={`p-2.5 rounded-lg border space-y-2 transition-colors ${
-      isHighRisk
-        ? 'bg-red-950/30 border-red-800/50'
-        : 'bg-neutral-800/50 border-neutral-700/50'
+    <div className={`p-2 rounded border ${
+      isHighRisk ? 'bg-red-950/20 border-red-800/30' : 'bg-neutral-700/30 border-neutral-600/30'
     }`}>
-      {/* Header row */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <RiskBadge risk={recipe.risk} />
-          {recipe.shapeImpact !== 'NONE' && (
-            <span className="text-[9px] text-gray-500 uppercase">
-              {recipe.shapeImpact} impact
-            </span>
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          disabled={disabled || !recipe.implemented}
+          className="mt-0.5 w-3.5 h-3.5 rounded border-neutral-500 bg-neutral-700 text-blue-500 focus:ring-blue-500"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <RiskBadge risk={recipe.risk} />
+            <span className="text-xs text-gray-200 font-medium">{recipe.title}</span>
+            {!recipe.implemented && (
+              <span className="text-[9px] text-gray-500">(Advisory)</span>
+            )}
+          </div>
+          <div className="text-[10px] text-gray-400 mt-0.5">{recipe.description}</div>
+          {isHighRisk && recipe.warnings.length > 0 && (
+            <div className="text-[10px] text-red-300/80 mt-1">
+              ⚠️ {recipe.warnings[0]}
+            </div>
           )}
         </div>
-        {recipe.implemented ? (
-          <button
-            onClick={onApply}
-            disabled={!canApply}
-            className={`text-[10px] px-2 py-1 rounded-md font-medium transition-colors ${
-              canApply
-                ? isHighRisk
-                  ? 'bg-red-600 text-white hover:bg-red-500'
-                  : 'bg-purple-600 text-white hover:bg-purple-500'
-                : 'bg-neutral-700 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {isApplying ? 'Applying...' : 'Apply Fix'}
-          </button>
-        ) : (
-          <span className="text-[10px] px-2 py-1 bg-neutral-700/50 rounded-md text-gray-400">
-            Advisory Only
-          </span>
-        )}
-      </div>
-
-      {/* Title and description */}
-      <div>
-        <div className="text-xs font-semibold text-gray-200">{recipe.title}</div>
-        <div className="text-[11px] text-gray-400 mt-0.5">{recipe.description}</div>
-      </div>
-
-      {/* Expected effect */}
-      <div className="text-[10px] text-gray-500">
-        <span className="text-gray-400">Effect:</span> {recipe.expectedEffect}
-      </div>
-
-      {/* Warnings */}
-      {recipe.warnings.length > 0 && (
-        <div className={`text-[10px] p-2 rounded ${
-          isHighRisk ? 'bg-red-950/50' : 'bg-amber-950/30'
-        }`}>
-          <div className={`font-medium mb-1 ${isHighRisk ? 'text-red-400' : 'text-amber-400'}`}>
-            {isHighRisk ? '⚠️ Destructive Operation' : '⚠️ Warnings'}
-          </div>
-          <ul className={`space-y-0.5 ${isHighRisk ? 'text-red-300/80' : 'text-amber-300/80'}`}>
-            {recipe.warnings.map((warning, i) => (
-              <li key={i} className="flex gap-1">
-                <span>•</span>
-                <span>{warning}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* High-risk confirmation checkbox */}
-      {isHighRisk && recipe.implemented && (
-        <label className="flex items-start gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={(e) => setConfirmed(e.target.checked)}
-            className="mt-0.5 w-3.5 h-3.5 rounded border-red-600 bg-red-950 text-red-500 focus:ring-red-500 focus:ring-offset-neutral-900"
-          />
-          <span className="text-[10px] text-red-300">
-            I understand this operation is destructive and may significantly alter the mesh
-          </span>
-        </label>
-      )}
+      </label>
     </div>
   )
 }
 
 export function SuggestedFixesNode({ id, data, selected }: NodeProps<SuggestedFixesNodeData>) {
-  const { getNode } = useReactFlow()
+  const { getNode, getNodes, addNodes, addEdges, setNodes, setEdges } = useReactFlow()
   const edges = useEdges()
-  const { getMesh, addMesh, setActiveMesh } = useMeshStore()
-  const getReport = useReportStore((state) => state.getReport)
-  const { setPlan, getPlan, setGenerating, setApplyingFix, setError } = useFixPlanStore()
+  const { getMesh, addMesh } = useMeshStore()
+  // Subscribe to the reports object directly so we re-render when reports change
+  const reports = useReportStore((state) => state.reports)
+  const { setPlan, setGenerating, setApplyingFix, setError } = useFixPlanStore()
+  // Subscribe to plans directly for reactivity
+  const plans = useFixPlanStore((state) => state.plans)
+  const hasAutoRun = useRef(false)
+  const [isGenerating, setIsGeneratingLocal] = useState(false)
+  const [isApplying, setIsApplying] = useState(false)
+  const [selectedFixes, setSelectedFixes] = useState<Set<string>>(new Set())
 
-  // Find connected mesh source node
-  const connectedMeshId = useMemo(() => {
-    // Find edge where this node is the target and the handle is 'mesh'
-    const incomingEdge = edges.find(
-      (e) => e.target === id && e.targetHandle === 'mesh'
-    )
-    if (!incomingEdge) return null
+  // Delete this node and its connected edges
+  const handleDelete = useCallback(() => {
+    setNodes((nodes) => nodes.filter((n) => n.id !== id))
+    setEdges((edges) => edges.filter((e) => e.source !== id && e.target !== id))
+  }, [id, setNodes, setEdges])
 
-    // Get the source node
-    const sourceNode = getNode(incomingEdge.source)
-    if (!sourceNode || sourceNode.type !== 'mesh-source') return null
+  // Find a non-overlapping position for a new node
+  const findNonOverlappingPosition = useCallback((baseX: number, baseY: number) => {
+    const nodes = getNodes()
+    const nodeWidth = 250
+    const nodeHeight = 300
+    const padding = 50
 
-    // Get the mesh ID from the source node's data
-    const sourceData = sourceNode.data as MeshSourceNodeData
-    return sourceData.meshId
-  }, [edges, id, getNode])
+    let x = baseX
+    let y = baseY
+    let attempts = 0
+    const maxAttempts = 10
 
-  // Get the fix plan and report if they exist
+    while (attempts < maxAttempts) {
+      const overlaps = nodes.some((n) => {
+        const dx = Math.abs(n.position.x - x)
+        const dy = Math.abs(n.position.y - y)
+        return dx < nodeWidth + padding && dy < nodeHeight + padding
+      })
+
+      if (!overlaps) break
+
+      if (attempts % 2 === 0) {
+        y += nodeHeight + padding
+      } else {
+        x += nodeWidth + padding
+        y = baseY
+      }
+      attempts++
+    }
+
+    return { x, y }
+  }, [getNodes])
+
+  // Use the meshId that was set when this node was created
+  // This ensures each node in a workflow uses its specific mesh, not a dynamically looked-up one
+  const connectedMeshId = data.meshId
+
+  // Get the fix plan and report if they exist (using direct subscriptions for reactivity)
   const fixPlan = useMemo(() => {
     if (!connectedMeshId) return null
-    return getPlan(connectedMeshId)
-  }, [connectedMeshId, getPlan])
+    return plans[connectedMeshId] || null
+  }, [connectedMeshId, plans])
 
   const report = useMemo(() => {
     if (!connectedMeshId) return null
-    return getReport(connectedMeshId)
-  }, [connectedMeshId, getReport])
+    return reports[connectedMeshId] || null
+  }, [connectedMeshId, reports])
 
-  // Determine status
-  const status = useMemo(() => {
-    if (data.generating) return 'running'
-    if (data.error) return 'error'
-    if (data.applyingFix) return 'running'
-    if (!fixPlan) return 'idle'
-    if (fixPlan.recommended.length > 0) return 'warn'
-    return 'pass'
-  }, [data.generating, data.error, data.applyingFix, fixPlan])
+  // All fixes combined
+  const allFixes = useMemo(() => {
+    if (!fixPlan) return []
+    return [...fixPlan.recommended, ...fixPlan.advisory]
+  }, [fixPlan])
 
-  // Handle generate fix plan
-  const handleRun = useCallback(() => {
-    if (!connectedMeshId || !report) {
-      console.warn('No mesh or report connected')
-      return
-    }
+  // Implemented fixes that can be selected
+  const implementedFixes = useMemo(() => {
+    return allFixes.filter((f) => f.implemented)
+  }, [allFixes])
 
+  // Generate fix plan
+  const runGeneration = useCallback(() => {
+    if (!connectedMeshId || !report) return
+
+    setIsGeneratingLocal(true)
     setGenerating(connectedMeshId, true)
     setError(connectedMeshId, null)
 
     try {
       const plan = generateFixPlan(report, connectedMeshId)
       setPlan(connectedMeshId, plan)
+      // Auto-select recommended fixes
+      const recommended = plan.recommended.filter((r) => r.implemented).map((r) => r.id)
+      setSelectedFixes(new Set(recommended))
     } catch (error) {
       setError(
         connectedMeshId,
         error instanceof Error ? error.message : 'Failed to generate fix plan'
       )
     } finally {
+      setIsGeneratingLocal(false)
       setGenerating(connectedMeshId, false)
     }
   }, [connectedMeshId, report, setGenerating, setError, setPlan])
 
-  // Handle apply fix
-  const handleApplyFix = useCallback(
-    async (recipe: FixRecipe) => {
-      if (!connectedMeshId) return
+  // Auto-run when connected and report exists
+  useEffect(() => {
+    if (connectedMeshId && report && !fixPlan && !hasAutoRun.current && !isGenerating) {
+      hasAutoRun.current = true
+      runGeneration()
+    }
+  }, [connectedMeshId, report, fixPlan, isGenerating, runGeneration])
 
-      const mesh = getMesh(connectedMeshId)
-      if (!mesh) {
-        setError(connectedMeshId, 'Mesh not found')
-        return
+  // Toggle fix selection
+  const toggleFix = useCallback((fixId: string, checked: boolean) => {
+    setSelectedFixes((prev) => {
+      const next = new Set(prev)
+      if (checked) {
+        next.add(fixId)
+      } else {
+        next.delete(fixId)
       }
+      return next
+    })
+  }, [])
 
-      setApplyingFix(connectedMeshId, recipe.id)
-      setError(connectedMeshId, null)
+  // Apply selected fixes
+  const handleApplyFixes = useCallback(async () => {
+    if (!connectedMeshId || selectedFixes.size === 0) return
 
-      try {
+    const mesh = getMesh(connectedMeshId)
+    if (!mesh) {
+      setError(connectedMeshId, 'Mesh not found')
+      return
+    }
+
+    setIsApplying(true)
+    setError(connectedMeshId, null)
+
+    // Get the selected recipes in order
+    const selectedRecipes = allFixes.filter((f) => selectedFixes.has(f.id))
+
+    try {
+      // Apply fixes sequentially
+      let currentMesh = mesh
+      let currentMeshId = connectedMeshId
+
+      for (const recipe of selectedRecipes) {
+        setApplyingFix(connectedMeshId, recipe.id)
+
+        const requestBody = {
+          mesh: {
+            positions: Array.from(currentMesh.positions),
+            indices: Array.from(currentMesh.indices),
+            normals: currentMesh.normals ? Array.from(currentMesh.normals) : undefined,
+          },
+          recipeId: recipe.id,
+          recipeType: recipe.type,
+          params: recipe.steps[0]?.params,
+        }
+        console.log('[FIX] Sending repair request:', { recipeType: recipe.type, params: requestBody.params })
+
         const response = await fetch('/api/printability/repair', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mesh: {
-              positions: Array.from(mesh.positions),
-              indices: Array.from(mesh.indices),
-              normals: mesh.normals ? Array.from(mesh.normals) : undefined,
-            },
-            recipeId: recipe.id,
-            recipeType: recipe.type,
-            params: recipe.steps[0]?.params,
-          }),
+          body: JSON.stringify(requestBody),
         })
 
         const result = await response.json()
+        console.log('[FIX] Repair response:', result)
 
         if (!response.ok || !result.success) {
-          throw new Error(result.error || 'Repair failed')
+          throw new Error(result.error || `Failed to apply ${recipe.title}`)
         }
 
-        // Create new mesh from repaired data
+        // Update current mesh for next iteration
         const repairedPositions = new Float32Array(result.mesh.positions)
         const repairedIndices = new Uint32Array(result.mesh.indices)
         const repairedNormals = result.mesh.normals
@@ -273,10 +290,9 @@ export function SuggestedFixesNode({ id, data, selected }: NodeProps<SuggestedFi
           maxZ = Math.max(maxZ, z)
         }
 
-        const newMeshId = `${connectedMeshId}-${recipe.type}-${Date.now()}`
-        addMesh({
-          id: newMeshId,
-          name: `${mesh.name} (${recipe.title})`,
+        currentMesh = {
+          id: `${currentMeshId}-${recipe.type}-${Date.now()}`,
+          name: `${mesh.name} (Fixed)`,
           positions: repairedPositions,
           indices: repairedIndices,
           normals: repairedNormals,
@@ -287,101 +303,175 @@ export function SuggestedFixesNode({ id, data, selected }: NodeProps<SuggestedFi
             max: [maxX, maxY, maxZ],
             dimensions: [maxX - minX, maxY - minY, maxZ - minZ],
           },
-        })
-
-        // Switch to the new mesh
-        setActiveMesh(newMeshId)
-      } catch (error) {
-        setError(
-          connectedMeshId,
-          error instanceof Error ? error.message : 'Repair failed'
-        )
-      } finally {
-        setApplyingFix(connectedMeshId, null)
+        }
+        currentMeshId = currentMesh.id
       }
-    },
-    [connectedMeshId, getMesh, setApplyingFix, setError, addMesh, setActiveMesh]
-  )
 
-  const applyingRecipeId = useMemo(() => {
-    if (!connectedMeshId) return null
-    return useFixPlanStore.getState().applyingFix[connectedMeshId]
-  }, [connectedMeshId, data.applyingFix])
+      // Add the final repaired mesh to the store
+      addMesh(currentMesh)
+
+      // Create a new ModelViewerNode to display the corrected mesh
+      const thisNode = getNode(id) as AppNode
+      if (thisNode) {
+        const position = findNonOverlappingPosition(thisNode.position.x + 350, thisNode.position.y)
+        const newNodeId = `model-viewer-fixed-${Date.now()}`
+        const newNode: AppNode = {
+          id: newNodeId,
+          type: NODE_TYPES.MODEL_VIEWER,
+          position,
+          data: {
+            label: 'Corrected Model',
+            status: 'pass',
+            meshId: currentMesh.id,
+            meshName: currentMesh.name,
+            error: null,
+          },
+        }
+
+        const newEdge: AppEdge = {
+          id: `edge-${id}-${newNodeId}`,
+          source: id,
+          sourceHandle: 'repaired_mesh',
+          target: newNodeId,
+          targetHandle: 'mesh',
+        }
+
+        addNodes([newNode])
+        addEdges([newEdge])
+      }
+
+      // Clear selections after successful apply
+      setSelectedFixes(new Set())
+    } catch (error) {
+      setError(
+        connectedMeshId,
+        error instanceof Error ? error.message : 'Repair failed'
+      )
+    } finally {
+      setIsApplying(false)
+      setApplyingFix(connectedMeshId, null)
+    }
+  }, [connectedMeshId, selectedFixes, allFixes, getMesh, getNode, id, addMesh, addNodes, addEdges, setApplyingFix, setError, findNonOverlappingPosition])
+
+  // Determine border color based on status
+  const getBorderColor = () => {
+    if (selected) return 'border-blue-500 shadow-lg shadow-blue-500/20'
+    if (isGenerating || isApplying) return 'border-blue-500'
+    if (data.error) return 'border-red-500'
+    if (fixPlan && fixPlan.recommended.length > 0) return 'border-yellow-500'
+    if (fixPlan) return 'border-blue-500'
+    return 'border-neutral-600'
+  }
 
   return (
-    <BaseNode
-      label={data.label}
-      status={status}
-      inputs={suggestedFixesDefinition.inputs}
-      outputs={suggestedFixesDefinition.outputs}
-      selected={selected}
-      onRun={handleRun}
+    <div
+      className={`bg-neutral-800 rounded-lg border-2 min-w-[220px] max-w-[300px] transition-all ${getBorderColor()}`}
     >
-      <div className="space-y-2 max-w-[280px]">
-        {/* Status message */}
-        {!connectedMeshId && (
-          <div className="text-xs text-gray-400">Connect mesh to generate fixes</div>
+      {/* Input handle */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="report"
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-neutral-800"
+      />
+
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-neutral-700 relative">
+        <div className="text-sm font-medium text-white pr-6">{data.label}</div>
+        {/* Delete button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleDelete()
+          }}
+          className="absolute top-2 right-2 p-1 text-gray-500 hover:text-red-400 transition-colors"
+          title="Delete node"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-3 space-y-2">
+        {/* Loading state */}
+        {isGenerating && (
+          <div className="space-y-2">
+            <div className="text-xs text-blue-400 animate-pulse">Generating fixes...</div>
+            <div className="w-full h-1 bg-neutral-700 rounded overflow-hidden">
+              <div className="h-full bg-blue-500 animate-pulse" style={{ width: '60%' }} />
+            </div>
+          </div>
         )}
 
-        {connectedMeshId && !report && (
-          <div className="text-xs text-gray-400">Run analysis first</div>
+        {/* Applying state */}
+        {isApplying && (
+          <div className="space-y-2">
+            <div className="text-xs text-blue-400 animate-pulse">Applying fixes...</div>
+            <div className="w-full h-1 bg-neutral-700 rounded overflow-hidden">
+              <div className="h-full bg-blue-500 animate-pulse" style={{ width: '80%' }} />
+            </div>
+          </div>
         )}
 
-        {connectedMeshId && report && !fixPlan && !data.generating && !data.error && (
-          <div className="text-xs text-gray-400">Click ▶ to generate fix plan</div>
-        )}
-
-        {data.generating && (
-          <div className="text-xs text-blue-400 animate-pulse">Generating...</div>
-        )}
-
+        {/* Error state */}
         {data.error && (
           <div className="text-xs text-red-400">{data.error}</div>
         )}
 
-        {/* Fix plan */}
-        {fixPlan && (
+        {/* No connection */}
+        {!connectedMeshId && !isGenerating && (
+          <div className="text-xs text-gray-400">Connect to report to generate fixes</div>
+        )}
+
+        {/* Waiting for report */}
+        {connectedMeshId && !report && !isGenerating && (
+          <div className="text-xs text-gray-400">Waiting for analysis...</div>
+        )}
+
+        {/* Fix checklist */}
+        {fixPlan && !isGenerating && !isApplying && (
           <>
-            {/* Recommended fixes */}
-            {fixPlan.recommended.length > 0 && (
-              <div className="space-y-1.5">
-                <div className="text-xs font-medium text-gray-300">
-                  Recommended ({fixPlan.recommended.length})
-                </div>
-                {fixPlan.recommended.map((recipe) => (
-                  <RecipeCard
+            {allFixes.length > 0 ? (
+              <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
+                {allFixes.map((recipe) => (
+                  <FixChecklistItem
                     key={recipe.id}
                     recipe={recipe}
-                    isApplying={applyingRecipeId === recipe.id}
-                    onApply={() => handleApplyFix(recipe)}
+                    checked={selectedFixes.has(recipe.id)}
+                    onChange={(checked) => toggleFix(recipe.id, checked)}
+                    disabled={isApplying}
                   />
                 ))}
               </div>
-            )}
-
-            {/* Advisory fixes */}
-            {fixPlan.advisory.length > 0 && (
-              <div className="space-y-1.5 pt-2 border-t border-neutral-700">
-                <div className="text-xs font-medium text-gray-400">
-                  Advisory ({fixPlan.advisory.length})
-                </div>
-                {fixPlan.advisory.map((recipe) => (
-                  <RecipeCard
-                    key={recipe.id}
-                    recipe={recipe}
-                    isApplying={applyingRecipeId === recipe.id}
-                    onApply={() => handleApplyFix(recipe)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {fixPlan.recommended.length === 0 && fixPlan.advisory.length === 0 && (
-              <div className="text-xs text-green-400">No fixes needed</div>
+            ) : (
+              <div className="text-xs text-blue-400">No fixes needed</div>
             )}
           </>
         )}
       </div>
-    </BaseNode>
+
+      {/* Apply Fixes button */}
+      {fixPlan && implementedFixes.length > 0 && !isGenerating && !isApplying && (
+        <div className="px-3 pb-3">
+          <button
+            onClick={handleApplyFixes}
+            disabled={selectedFixes.size === 0}
+            className="w-full px-3 py-1.5 text-xs font-medium bg-white text-neutral-900 hover:bg-blue-500 hover:text-white disabled:bg-neutral-700 disabled:text-gray-500 disabled:cursor-not-allowed rounded transition-colors"
+          >
+            Apply {selectedFixes.size > 0 ? `${selectedFixes.size} Fix${selectedFixes.size > 1 ? 'es' : ''}` : 'Fixes'}
+          </button>
+        </div>
+      )}
+
+      {/* Output handle */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="repaired_mesh"
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-neutral-800"
+      />
+    </div>
   )
 }

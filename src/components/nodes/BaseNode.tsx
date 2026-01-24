@@ -16,7 +16,7 @@ interface BaseNodeProps {
 const statusColors: Record<NodeStatus, { bg: string; text: string; glow: string }> = {
   idle: { bg: 'bg-neutral-600', text: 'text-gray-300', glow: '' },
   running: { bg: 'bg-blue-500', text: 'text-white', glow: 'shadow-blue-500/50' },
-  pass: { bg: 'bg-emerald-500', text: 'text-white', glow: 'shadow-emerald-500/50' },
+  pass: { bg: 'bg-blue-500', text: 'text-white', glow: 'shadow-blue-500/50' },
   warn: { bg: 'bg-amber-500', text: 'text-black', glow: 'shadow-amber-500/50' },
   fail: { bg: 'bg-red-500', text: 'text-white', glow: 'shadow-red-500/50' },
   error: { bg: 'bg-red-700', text: 'text-white', glow: 'shadow-red-700/50' },
@@ -71,27 +71,32 @@ export function BaseNode({
       {/* Header with gradient */}
       <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-r from-neutral-700/50 to-neutral-800/50 rounded-t-lg border-b border-neutral-600/50">
         <div className="flex items-center gap-2 min-w-0">
-          {/* Status indicator dot */}
-          <div
-            className={`
-              w-2.5 h-2.5 rounded-full flex-shrink-0
-              ${statusStyle.bg}
-              ${status === 'running' ? 'animate-pulse' : ''}
-              ${statusStyle.glow ? `shadow-md ${statusStyle.glow}` : ''}
-            `}
-          />
+          {/* Status indicator dot - hidden when idle */}
+          {status !== 'idle' && (
+            <div
+              className={`
+                w-2.5 h-2.5 rounded-full flex-shrink-0
+                ${statusStyle.bg}
+                ${status === 'running' ? 'animate-pulse' : ''}
+                ${statusStyle.glow ? `shadow-md ${statusStyle.glow}` : ''}
+              `}
+            />
+          )}
           <span className="text-sm font-semibold text-white truncate">{label}</span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span
-            className={`
-              px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wide
-              ${statusStyle.bg} ${statusStyle.text}
-              ${status === 'running' ? 'animate-pulse' : ''}
-            `}
-          >
-            {statusLabels[status]}
-          </span>
+          {/* Status badge - hidden when idle */}
+          {status !== 'idle' && (
+            <span
+              className={`
+                px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wide
+                ${statusStyle.bg} ${statusStyle.text}
+                ${status === 'running' ? 'animate-pulse' : ''}
+              `}
+            >
+              {statusLabels[status]}
+            </span>
+          )}
           {onRun && (
             <button
               onClick={onRun}

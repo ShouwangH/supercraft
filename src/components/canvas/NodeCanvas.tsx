@@ -4,7 +4,6 @@ import { useCallback, useMemo } from 'react'
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -116,22 +115,22 @@ export function NodeCanvas({
         onConnect={handleConnect}
         onSelectionChange={handleSelectionChange}
         nodeTypes={nodeTypes}
-        fitView
+        defaultEdgeOptions={{
+          style: { stroke: '#3b82f6', strokeWidth: 2 },
+        }}
+        defaultViewport={{ x: 50, y: 50, zoom: 0.85 }}
+        minZoom={0.3}
+        maxZoom={1.5}
         className="bg-neutral-900"
       >
         <Background color="#333" gap={16} />
         <Controls className="!bg-neutral-800 !border-neutral-600" />
-        <MiniMap
-          className="!bg-neutral-800"
-          nodeColor="#444"
-          maskColor="rgba(0, 0, 0, 0.8)"
-        />
       </ReactFlow>
     </div>
   )
 }
 
-// Helper to create initial nodes for testing/demo
+// Helper to create initial nodes - only MeshSourceNode at start
 export function createInitialNodes(): { nodes: AppNode[]; edges: AppEdge[] } {
   const nodes: AppNode[] = [
     {
@@ -140,58 +139,10 @@ export function createInitialNodes(): { nodes: AppNode[]; edges: AppEdge[] } {
       position: { x: 100, y: 100 },
       data: { label: 'Mesh Source', status: 'idle', meshId: null, meshName: null, error: null },
     },
-    {
-      id: 'printability-report-1',
-      type: 'printability-report',
-      position: { x: 400, y: 100 },
-      data: {
-        label: 'Printability Report',
-        status: 'idle',
-        meshId: null,
-        reportId: null,
-        analyzing: false,
-        error: null,
-      },
-    },
-    {
-      id: 'suggested-fixes-1',
-      type: 'suggested-fixes',
-      position: { x: 700, y: 100 },
-      data: {
-        label: 'Suggested Fixes',
-        status: 'idle',
-        meshId: null,
-        fixPlanId: null,
-        generating: false,
-        applyingFix: null,
-        error: null,
-      },
-    },
   ]
 
-  const edges: AppEdge[] = [
-    {
-      id: 'e1-2',
-      source: 'mesh-source-1',
-      target: 'printability-report-1',
-      sourceHandle: 'mesh',
-      targetHandle: 'mesh',
-    },
-    {
-      id: 'e1-3',
-      source: 'mesh-source-1',
-      target: 'suggested-fixes-1',
-      sourceHandle: 'mesh',
-      targetHandle: 'mesh',
-    },
-    {
-      id: 'e2-3',
-      source: 'printability-report-1',
-      target: 'suggested-fixes-1',
-      sourceHandle: 'report',
-      targetHandle: 'report',
-    },
-  ]
+  // No initial edges - nodes created dynamically via button clicks
+  const edges: AppEdge[] = []
 
   return { nodes, edges }
 }

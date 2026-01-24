@@ -1,23 +1,15 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NodeProps } from 'reactflow'
 import { useReactFlow, useEdges } from 'reactflow'
-import type { PrintabilityReportNodeData, MeshSourceNodeData } from '@/types/nodes'
-import { BaseNode } from './BaseNode'
+import { Handle, Position } from 'reactflow'
+import type { PrintabilityReportNodeData, AppNode, AppEdge } from '@/types/nodes'
+import { NODE_TYPES } from '@/types/nodes'
 import { printabilityReportDefinition } from '@/lib/nodes/registry'
 import { useMeshStore } from '@/stores/meshStore'
 import { useReportStore } from '@/stores/reportStore'
-import { useViewerStore, type OverlayMode } from '@/stores/viewerStore'
 import type { Issue } from '@/types/report'
-import {
-  downloadReportJson,
-  downloadScreenshot,
-  downloadExportBundle,
-  getRelevantOverlayModes,
-  type ExportBundle,
-  type ExportScreenshot,
-} from '@/lib/export'
 
 /**
  * Maps issue severity to CSS color class
@@ -36,117 +28,81 @@ function getSeverityColor(severity: string): string {
 }
 
 /**
- * Maps issue type to overlay mode
+ * Compact issue display
  */
-function getOverlayModeForIssue(issueType: string): OverlayMode | null {
-  switch (issueType) {
-    case 'boundary_edges':
-      return 'boundary_edges'
-    case 'non_manifold_edges':
-      return 'non_manifold_edges'
-    case 'floater_components':
-      return 'components'
-    case 'overhang':
-      return 'overhang'
-    default:
-      return null
-  }
-}
-
-/**
- * Issue card component
- */
-function IssueCard({
-  issue,
-  isHighlighted,
-  onToggleHighlight,
-}: {
-  issue: Issue
-  isHighlighted: boolean
-  onToggleHighlight: () => void
-}) {
-  const overlayMode = getOverlayModeForIssue(issue.type)
-  const hasOverlay = overlayMode !== null
-
+function IssueItem({ issue }: { issue: Issue }) {
   return (
-    <div className="p-2 bg-neutral-800 rounded border border-neutral-700 space-y-1">
-      <div className="flex items-center justify-between">
-        <span className={`text-xs font-medium ${getSeverityColor(issue.severity)}`}>
-          {issue.severity}
-        </span>
-        {hasOverlay && (
-          <button
-            onClick={onToggleHighlight}
-            className={`text-[10px] px-1.5 py-0.5 rounded ${
-              isHighlighted
-                ? 'bg-blue-600 text-white'
-                : 'bg-neutral-700 text-gray-300 hover:bg-neutral-600'
-            }`}
-          >
-            {isHighlighted ? 'Hide' : 'Show'}
-          </button>
-        )}
-      </div>
-      <div className="text-xs font-medium text-gray-200">{issue.title}</div>
-      <div className="text-[10px] text-gray-400">{issue.summary}</div>
+    <div className="flex items-center gap-2 text-xs">
+      <span className={`font-medium ${getSeverityColor(issue.severity)}`}>
+        {issue.severity}
+      </span>
+      <span className="text-gray-300 truncate">{issue.title}</span>
     </div>
   )
 }
 
 export function PrintabilityReportNode({ id, data, selected }: NodeProps<PrintabilityReportNodeData>) {
-  const { getNode } = useReactFlow()
+  const { getNode, getNodes, addNodes, addEdges, setNodes, setEdges } = useReactFlow()
   const edges = useEdges()
   const getMesh = useMeshStore((state) => state.getMesh)
-  const { setReport, setAnalyzing, setError, getReport } = useReportStore()
-  const { overlayMode, setOverlayMode, clearOverlay, captureScreenshot } = useViewerStore()
-  const [isExporting, setIsExporting] = useState(false)
+  const { setReport, setAnalyzing, setError } = useReportStore()
+  // Subscribe to reports directly for reactivity
+  const reports = useReportStore((state) => state.reports)
+  const hasAutoRun = useRef(false)
+  const [isAnalyzing, setIsAnalyzingLocal] = useState(false)
 
-  // Find connected mesh source node
-  const connectedMeshId = useMemo(() => {
-    // Find edge where this node is the target and the handle is 'mesh'
-    const incomingEdge = edges.find(
-      (e) => e.target === id && e.targetHandle === 'mesh'
-    )
-    if (!incomingEdge) return null
+  // Delete this node and its connected edges
+  const handleDelete = useCallback(() => {
+    setNodes((nodes) => nodes.filter((n) => n.id !== id))
+    setEdges((edges) => edges.filter((e) => e.source !== id && e.target !== id))
+  }, [id, setNodes, setEdges])
 
-    // Get the source node
-    const sourceNode = getNode(incomingEdge.source)
-    if (!sourceNode || sourceNode.type !== 'mesh-source') return null
+  // Find a non-overlapping position for a new node
+  const findNonOverlappingPosition = useCallback((baseX: number, baseY: number) => {
+    const nodes = getNodes()
+    const nodeWidth = 250
+    const nodeHeight = 300
+    const padding = 50
 
-    // Get the mesh ID from the source node's data
-    const sourceData = sourceNode.data as MeshSourceNodeData
-    return sourceData.meshId
-  }, [edges, id, getNode])
+    let x = baseX
+    let y = baseY
+    let attempts = 0
+    const maxAttempts = 10
 
-  // Get the report if it exists
+    while (attempts < maxAttempts) {
+      const overlaps = nodes.some((n) => {
+        const dx = Math.abs(n.position.x - x)
+        const dy = Math.abs(n.position.y - y)
+        return dx < nodeWidth + padding && dy < nodeHeight + padding
+      })
+
+      if (!overlaps) break
+
+      if (attempts % 2 === 0) {
+        y += nodeHeight + padding
+      } else {
+        x += nodeWidth + padding
+        y = baseY
+      }
+      attempts++
+    }
+
+    return { x, y }
+  }, [getNodes])
+
+  // Use the meshId that was set when this node was created
+  // This ensures each node in a workflow uses its specific mesh, not a dynamically looked-up one
+  const connectedMeshId = data.meshId
+
+  // Get the report if it exists (using direct subscription for reactivity)
   const report = useMemo(() => {
     if (!connectedMeshId) return null
-    return getReport(connectedMeshId)
-  }, [connectedMeshId, getReport])
+    return reports[connectedMeshId] || null
+  }, [connectedMeshId, reports])
 
-  // Determine status based on report
-  const status = useMemo(() => {
-    if (data.analyzing) return 'running'
-    if (data.error) return 'error'
-    if (!report) return 'idle'
-    switch (report.status) {
-      case 'PASS':
-        return 'pass'
-      case 'WARN':
-        return 'warn'
-      case 'FAIL':
-        return 'fail'
-      default:
-        return 'idle'
-    }
-  }, [data.analyzing, data.error, report])
-
-  // Handle run analysis
-  const handleRun = useCallback(async () => {
-    if (!connectedMeshId) {
-      console.warn('No mesh connected')
-      return
-    }
+  // Run analysis
+  const runAnalysis = useCallback(async () => {
+    if (!connectedMeshId) return
 
     const mesh = getMesh(connectedMeshId)
     if (!mesh) {
@@ -154,9 +110,9 @@ export function PrintabilityReportNode({ id, data, selected }: NodeProps<Printab
       return
     }
 
+    setIsAnalyzingLocal(true)
     setAnalyzing(connectedMeshId, true)
     setError(connectedMeshId, null)
-    clearOverlay()
 
     try {
       const response = await fetch('/api/printability/analyze', {
@@ -184,120 +140,118 @@ export function PrintabilityReportNode({ id, data, selected }: NodeProps<Printab
         error instanceof Error ? error.message : 'Analysis failed'
       )
     } finally {
+      setIsAnalyzingLocal(false)
       setAnalyzing(connectedMeshId, false)
     }
-  }, [connectedMeshId, getMesh, setAnalyzing, setError, setReport, clearOverlay])
+  }, [connectedMeshId, getMesh, setAnalyzing, setError, setReport])
 
-  // Handle toggle highlight for an issue
-  const handleToggleHighlight = useCallback(
-    (issueType: string) => {
-      const mode = getOverlayModeForIssue(issueType)
-      if (!mode) return
-
-      if (overlayMode === mode) {
-        clearOverlay()
-      } else {
-        setOverlayMode(mode)
-      }
-    },
-    [overlayMode, setOverlayMode, clearOverlay]
-  )
-
-  // Get mesh name for export
-  const meshName = useMemo(() => {
-    if (!connectedMeshId) return 'mesh'
-    const mesh = getMesh(connectedMeshId)
-    return mesh?.name || 'mesh'
-  }, [connectedMeshId, getMesh])
-
-  // Handle export report JSON
-  const handleExportJson = useCallback(() => {
-    if (!report) return
-    downloadReportJson(report, meshName)
-  }, [report, meshName])
-
-  // Handle export screenshot
-  const handleExportScreenshot = useCallback(() => {
-    const screenshot = captureScreenshot()
-    if (screenshot) {
-      const overlayName = overlayMode === 'none' ? 'base' : overlayMode
-      downloadScreenshot(screenshot, `${meshName}-${overlayName}`)
+  // Auto-run analysis when connected to mesh
+  useEffect(() => {
+    if (connectedMeshId && !report && !hasAutoRun.current && !isAnalyzing) {
+      hasAutoRun.current = true
+      runAnalysis()
     }
-  }, [captureScreenshot, meshName, overlayMode])
+  }, [connectedMeshId, report, isAnalyzing, runAnalysis])
 
-  // Handle export full bundle
-  const handleExportBundle = useCallback(async () => {
-    if (!report) return
+  // Handle creating SuggestedFixesNode
+  const handleCreateFixes = useCallback(() => {
+    if (!report || !connectedMeshId) return
 
-    setIsExporting(true)
+    const thisNode = getNode(id) as AppNode
+    if (!thisNode) return
 
-    try {
-      const relevantModes = getRelevantOverlayModes(report)
-      const screenshots: ExportScreenshot[] = []
-
-      // Capture screenshots for each relevant overlay mode
-      const originalMode = overlayMode
-
-      for (const { mode, name } of relevantModes) {
-        setOverlayMode(mode)
-        // Small delay to let the overlay render
-        await new Promise((resolve) => setTimeout(resolve, 200))
-
-        const screenshot = captureScreenshot()
-        if (screenshot) {
-          screenshots.push({ name, dataUrl: screenshot })
-        }
-      }
-
-      // Restore original overlay mode
-      setOverlayMode(originalMode)
-
-      const bundle: ExportBundle = {
-        report,
-        screenshots,
-        meshName,
-        timestamp: new Date().toISOString(),
-      }
-
-      await downloadExportBundle(bundle)
-    } catch (error) {
-      console.error('Export failed:', error)
-    } finally {
-      setIsExporting(false)
+    const position = findNonOverlappingPosition(thisNode.position.x + 350, thisNode.position.y)
+    const newNodeId = `suggested-fixes-${Date.now()}`
+    const newNode: AppNode = {
+      id: newNodeId,
+      type: NODE_TYPES.SUGGESTED_FIXES,
+      position,
+      data: {
+        label: 'Suggested Fixes',
+        status: 'idle',
+        meshId: connectedMeshId,
+        fixPlanId: null,
+        generating: false,
+        applyingFix: null,
+        error: null,
+      },
     }
-  }, [report, meshName, overlayMode, setOverlayMode, captureScreenshot])
+
+    const meshEdge: AppEdge = {
+      id: `edge-mesh-${id}-${newNodeId}`,
+      source: id,
+      sourceHandle: 'report',
+      target: newNodeId,
+      targetHandle: 'report',
+    }
+
+    addNodes([newNode])
+    addEdges([meshEdge])
+  }, [id, report, connectedMeshId, getNode, addNodes, addEdges, findNonOverlappingPosition])
+
+  // Determine border color based on status
+  const getBorderColor = () => {
+    if (selected) return 'border-blue-500 shadow-lg shadow-blue-500/20'
+    if (isAnalyzing) return 'border-blue-500'
+    if (data.error) return 'border-red-500'
+    if (report?.status === 'FAIL') return 'border-red-500'
+    if (report?.status === 'WARN') return 'border-yellow-500'
+    if (report?.status === 'PASS') return 'border-blue-500'
+    return 'border-neutral-600'
+  }
 
   return (
-    <BaseNode
-      label={data.label}
-      status={status}
-      inputs={printabilityReportDefinition.inputs}
-      outputs={printabilityReportDefinition.outputs}
-      selected={selected}
-      onRun={handleRun}
+    <div
+      className={`bg-neutral-800 rounded-lg border-2 min-w-[200px] transition-all ${getBorderColor()}`}
     >
-      <div className="space-y-2 max-w-[200px]">
-        {/* Status message */}
-        {!connectedMeshId && (
-          <div className="text-xs text-gray-400">Connect mesh to analyze</div>
+      {/* Input handle */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="mesh"
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-neutral-800"
+      />
+
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-neutral-700 relative">
+        <div className="text-sm font-medium text-white pr-6">{data.label}</div>
+        {/* Delete button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleDelete()
+          }}
+          className="absolute top-2 right-2 p-1 text-gray-500 hover:text-red-400 transition-colors"
+          title="Delete node"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-3 space-y-2">
+        {/* Loading state */}
+        {isAnalyzing && (
+          <div className="space-y-2">
+            <div className="text-xs text-blue-400 animate-pulse">Analyzing mesh...</div>
+            <div className="w-full h-1 bg-neutral-700 rounded overflow-hidden">
+              <div className="h-full bg-blue-500 animate-pulse" style={{ width: '60%' }} />
+            </div>
+          </div>
         )}
 
-        {connectedMeshId && !report && !data.analyzing && !data.error && (
-          <div className="text-xs text-gray-400">Click ▶ to run analysis</div>
-        )}
-
-        {data.analyzing && (
-          <div className="text-xs text-blue-400 animate-pulse">Analyzing...</div>
-        )}
-
+        {/* Error state */}
         {data.error && (
           <div className="text-xs text-red-400">{data.error}</div>
         )}
 
-        {/* Report summary */}
-        {report && (
+        {/* Report results */}
+        {report && !isAnalyzing && (
           <>
-            <div className="text-xs space-y-1 border-b border-neutral-700 pb-2">
+            {/* Stats */}
+            <div className="text-xs space-y-1">
               <div className="flex justify-between">
                 <span className="text-gray-400">Triangles:</span>
                 <span className="text-gray-200">{report.meshStats.triangleCount.toLocaleString()}</span>
@@ -308,60 +262,53 @@ export function PrintabilityReportNode({ id, data, selected }: NodeProps<Printab
               </div>
             </div>
 
-            {/* Issues list */}
+            {/* Issues */}
             {report.issues.length > 0 ? (
-              <div className="space-y-1.5">
+              <div className="pt-2 border-t border-neutral-700 space-y-1">
                 <div className="text-xs font-medium text-gray-300">
                   Issues ({report.issues.length})
                 </div>
-                {report.issues.map((issue) => (
-                  <IssueCard
-                    key={issue.id}
-                    issue={issue}
-                    isHighlighted={overlayMode === getOverlayModeForIssue(issue.type)}
-                    onToggleHighlight={() => handleToggleHighlight(issue.type)}
-                  />
-                ))}
+                <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                  {report.issues.map((issue) => (
+                    <IssueItem key={issue.id} issue={issue} />
+                  ))}
+                </div>
               </div>
             ) : (
-              <div className="text-xs text-green-400">No issues found</div>
-            )}
-
-            {/* Export buttons */}
-            <div className="pt-2 mt-2 border-t border-neutral-700 space-y-1.5">
-              <div className="text-xs font-medium text-gray-300">Export</div>
-              <div className="flex flex-wrap gap-1">
-                <button
-                  onClick={handleExportJson}
-                  className="text-[10px] px-2 py-1 rounded bg-neutral-700 text-gray-300 hover:bg-neutral-600 transition-colors"
-                  title="Download report JSON"
-                >
-                  JSON
-                </button>
-                <button
-                  onClick={handleExportScreenshot}
-                  className="text-[10px] px-2 py-1 rounded bg-neutral-700 text-gray-300 hover:bg-neutral-600 transition-colors"
-                  title="Download current view screenshot"
-                >
-                  Screenshot
-                </button>
-                <button
-                  onClick={handleExportBundle}
-                  disabled={isExporting}
-                  className={`text-[10px] px-2 py-1 rounded transition-colors ${
-                    isExporting
-                      ? 'bg-neutral-600 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-500'
-                  }`}
-                  title="Download full export bundle with all screenshots"
-                >
-                  {isExporting ? 'Exporting...' : 'Full Bundle'}
-                </button>
+              <div className="text-xs text-blue-400 pt-2 border-t border-neutral-700">
+                No issues found
               </div>
-            </div>
+            )}
           </>
         )}
+
+        {/* No mesh connected */}
+        {!connectedMeshId && !isAnalyzing && (
+          <div className="text-xs text-gray-400">Connect mesh to analyze</div>
+        )}
       </div>
-    </BaseNode>
+
+      {/* AI Fixes button - always at bottom when report exists */}
+      {report && !isAnalyzing && (
+        <div className="px-3 pb-3">
+          <button
+            onClick={handleCreateFixes}
+            className="w-full px-3 py-1.5 text-xs font-medium bg-white text-neutral-900 hover:bg-blue-500 hover:text-white rounded transition-colors flex items-center justify-center gap-1.5"
+            title="Generate AI-powered fix suggestions"
+          >
+            <span>✨</span>
+            <span>AI Fixes</span>
+          </button>
+        </div>
+      )}
+
+      {/* Output handle */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="report"
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-neutral-800"
+      />
+    </div>
   )
 }

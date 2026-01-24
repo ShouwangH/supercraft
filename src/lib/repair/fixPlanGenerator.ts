@@ -28,7 +28,7 @@ function createFloaterRemovalRecipe(issue: Issue): FixRecipe {
     steps: [
       {
         op: 'remove_components_below_threshold',
-        params: { thresholdPercent: 5 },
+        params: { keepOnlyLargest: true },
       },
     ],
     warnings: [
@@ -126,6 +126,33 @@ function createWatertightRemeshRecipe(issues: Issue[]): FixRecipe {
 }
 
 /**
+ * Generates a fix recipe for CSG boolean union
+ */
+function createCsgUnionRecipe(issue: Issue): FixRecipe {
+  const nonManifoldEdgeCount = (issue.details?.nonManifoldEdgeCount as number) ?? 0
+
+  return {
+    id: `fix-csg-union-${Date.now()}`,
+    type: 'csg_union',
+    title: 'Boolean Union (Merge)',
+    description: `Merge overlapping components to fix ${nonManifoldEdgeCount} non-manifold edge${nonManifoldEdgeCount !== 1 ? 's' : ''}.`,
+    targetIssues: [issue.id],
+    risk: 'MEDIUM',
+    shapeImpact: 'LOCAL',
+    deterministic: true,
+    implemented: true,
+    steps: [
+      { op: 'csg_union', params: {} },
+    ],
+    warnings: [
+      'Merges overlapping geometry using boolean operations.',
+      'May change triangle count. Verify appearance after.',
+    ],
+    expectedEffect: 'Creates a single watertight mesh from overlapping components.',
+  }
+}
+
+/**
  * Sorts recipes by priority (lower risk first, then by impact)
  */
 function sortRecipesByPriority(recipes: FixRecipe[]): FixRecipe[] {
@@ -178,6 +205,12 @@ export function generateFixPlan(
   if (boundaryIssues.length > 0) {
     // Watertight remesh is now implemented - add to recommended
     recommended.push(createWatertightRemeshRecipe(boundaryIssues))
+  }
+
+  // Check for non-manifold issues - suggest CSG union to merge overlapping geometry
+  const nonManifoldIssue = report.issues.find((i) => i.type === 'non_manifold_edges')
+  if (nonManifoldIssue) {
+    recommended.push(createCsgUnionRecipe(nonManifoldIssue))
   }
 
   return {

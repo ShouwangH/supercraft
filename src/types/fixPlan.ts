@@ -24,6 +24,7 @@ export type FixOperationType =
   | 'mesh_cleanup'
   | 'auto_orient'
   | 'watertight_remesh'
+  | 'csg_union'
 
 /**
  * A single step in a fix operation
@@ -105,6 +106,12 @@ export interface FixResult {
     verticesAdded?: number
     /** Components removed */
     componentsRemoved?: number
+    /** Components merged via CSG union */
+    componentsUnioned?: number
+    /** Triangles before operation */
+    trianglesBefore?: number
+    /** Triangles after operation */
+    trianglesAfter?: number
     /** Number of holes filled (for watertight remesh) */
     holesFilled?: number
     /** Number of holes skipped due to size (for watertight remesh) */

@@ -97,17 +97,28 @@ function generateIssues(results: AnalysisResults): Issue[] {
     })
   }
 
-  // Floater components (RISK)
-  if (results.components.floaterIndices.length > 0) {
+  // Floater/disconnected components (RISK)
+  // Detect either: small floaters below threshold OR multiple disconnected components
+  const hasFloaters = results.components.floaterIndices.length > 0
+  const hasMultipleComponents = results.components.componentCount > 1
+
+  if (hasFloaters || hasMultipleComponents) {
+    const floaterCount = hasFloaters
+      ? results.components.floaterIndices.length
+      : results.components.componentCount - 1
+    const floaterFaceCount = hasFloaters
+      ? results.components.floaterFaceCount
+      : results.components.componentSizes.reduce((a, b) => a + b, 0) - results.components.componentSizes[results.components.mainComponentIndex]
+
     issues.push({
       id: `issue-${issueId++}`,
       type: 'floater_components',
       severity: 'RISK',
       title: 'Disconnected Geometry',
-      summary: `Found ${results.components.floaterIndices.length} small disconnected component${results.components.floaterIndices.length !== 1 ? 's' : ''} (${results.components.floaterFaceCount} face${results.components.floaterFaceCount !== 1 ? 's' : ''} total).`,
+      summary: `Found ${floaterCount} disconnected component${floaterCount !== 1 ? 's' : ''} (${floaterFaceCount} face${floaterFaceCount !== 1 ? 's' : ''} total).`,
       details: {
-        floaterCount: results.components.floaterIndices.length,
-        floaterFaceCount: results.components.floaterFaceCount,
+        floaterCount,
+        floaterFaceCount,
         componentCount: results.components.componentCount,
       },
       overlayKeys: ['floater_components'],

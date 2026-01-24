@@ -76,7 +76,7 @@ export function Inspector({ nodes }: InspectorProps) {
                 key={output.id}
                 className="bg-neutral-700 rounded p-2 flex items-center gap-2"
               >
-                <div className="w-2 h-2 rounded-full bg-green-400" />
+                <div className="w-2 h-2 rounded-full bg-blue-400" />
                 <span className="text-sm text-white">{output.label}</span>
                 <span className="text-xs text-gray-500">({output.type})</span>
               </div>
