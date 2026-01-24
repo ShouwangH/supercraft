@@ -52,13 +52,23 @@ export interface SuggestedFixesNodeData extends BaseNodeData {
   error: string | null
 }
 
-export type AppNodeData = MeshSourceNodeData | PrintabilityReportNodeData | SuggestedFixesNodeData
+export interface ModelViewerNodeData extends BaseNodeData {
+  /** Mesh ID to display */
+  meshId: string | null
+  /** Mesh name for display */
+  meshName: string | null
+  /** Error message */
+  error: string | null
+}
+
+export type AppNodeData = MeshSourceNodeData | PrintabilityReportNodeData | SuggestedFixesNodeData | ModelViewerNodeData
 
 export type AppNode = Node<AppNodeData>
 export type AppEdge = Edge
 
 export const NODE_TYPES = {
   MESH_SOURCE: 'mesh-source',
+  MODEL_VIEWER: 'model-viewer',
   PRINTABILITY_REPORT: 'printability-report',
   SUGGESTED_FIXES: 'suggested-fixes',
 } as const

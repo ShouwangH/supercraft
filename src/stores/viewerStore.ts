@@ -21,6 +21,10 @@ interface ViewerState {
   overlayMode: OverlayMode
   /** Opacity for overlay rendering (0-1) */
   overlayOpacity: number
+  /** Model darkness (0 = white, 1 = black) */
+  modelDarkness: number
+  /** Background darkness (0 = white, 1 = black) */
+  backgroundDarkness: number
   /** Registered screenshot callback from MeshViewer */
   screenshotCallback: ScreenshotCallback | null
 
@@ -29,6 +33,8 @@ interface ViewerState {
   setWireframe: (wireframe: boolean) => void
   setOverlayMode: (mode: OverlayMode) => void
   setOverlayOpacity: (opacity: number) => void
+  setModelDarkness: (darkness: number) => void
+  setBackgroundDarkness: (darkness: number) => void
   toggleGrid: () => void
   toggleAxes: () => void
   toggleWireframe: () => void
@@ -42,11 +48,13 @@ interface ViewerState {
 }
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
-  showGrid: true,
+  showGrid: false,
   showAxes: false,
   wireframe: false,
   overlayMode: 'none',
   overlayOpacity: 0.8,
+  modelDarkness: 0.3,
+  backgroundDarkness: 0.85,
   screenshotCallback: null,
 
   setShowGrid: (show) => set({ showGrid: show }),
@@ -54,6 +62,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   setWireframe: (wireframe) => set({ wireframe }),
   setOverlayMode: (mode) => set({ overlayMode: mode }),
   setOverlayOpacity: (opacity) => set({ overlayOpacity: Math.max(0, Math.min(1, opacity)) }),
+  setModelDarkness: (darkness) => set({ modelDarkness: Math.max(0, Math.min(1, darkness)) }),
+  setBackgroundDarkness: (darkness) => set({ backgroundDarkness: Math.max(0, Math.min(1, darkness)) }),
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   toggleAxes: () => set((state) => ({ showAxes: !state.showAxes })),
   toggleWireframe: () => set((state) => ({ wireframe: !state.wireframe })),

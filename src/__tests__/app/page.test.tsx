@@ -3,15 +3,17 @@ import { render, screen } from '@testing-library/react'
 import Home from '@/app/page'
 
 describe('Home Page', () => {
-  it('renders the Inspector panel', () => {
+  it('renders the node canvas', () => {
     render(<Home />)
 
-    expect(screen.getByText('Inspector')).toBeInTheDocument()
+    // The initial MeshSourceNode should be rendered
+    expect(screen.getByText('Mesh Source')).toBeInTheDocument()
   })
 
-  it('shows select node prompt when no node selected', () => {
+  it('shows the initial mesh source node with load options', () => {
     render(<Home />)
 
-    expect(screen.getByText('Select a node to view details')).toBeInTheDocument()
+    expect(screen.getByText('Load File')).toBeInTheDocument()
+    expect(screen.getByText('No mesh loaded')).toBeInTheDocument()
   })
 })

@@ -73,6 +73,13 @@ export const printabilityReportDefinition: NodeTypeDefinition = {
   ],
 }
 
+export const modelViewerDefinition: NodeTypeDefinition = {
+  type: NODE_TYPES.MODEL_VIEWER,
+  label: '3D Model',
+  inputs: [{ id: 'mesh', label: 'Mesh', type: 'mesh' }],
+  outputs: [{ id: 'mesh', label: 'Mesh', type: 'mesh' }],
+}
+
 export const suggestedFixesDefinition: NodeTypeDefinition = {
   type: NODE_TYPES.SUGGESTED_FIXES,
   label: 'Suggested Fixes',

@@ -244,13 +244,11 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
-  const gridRef = useRef<THREE.GridHelper | null>(null)
-  const axesRef = useRef<THREE.AxesHelper | null>(null)
   const meshRef = useRef<THREE.Mesh | null>(null)
   const overlayRef = useRef<THREE.Object3D | null>(null)
   const frameIdRef = useRef<number>(0)
 
-  const { showGrid, showAxes, wireframe, overlayMode, registerScreenshotCallback, unregisterScreenshotCallback } = useViewerStore()
+  const { overlayMode, modelDarkness, backgroundDarkness, registerScreenshotCallback, unregisterScreenshotCallback } = useViewerStore()
   const activeMesh = useMeshStore((state) => {
     const activeMeshId = state.activeMeshId
     return activeMeshId ? state.meshes[activeMeshId] : undefined
@@ -278,9 +276,10 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
       return
     }
 
-    // Scene
+    // Scene with darkness-controlled background
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x1a1a1a)
+    const bgValue = 1 - backgroundDarkness // 0 = white, 1 = black, so invert
+    scene.background = new THREE.Color(bgValue, bgValue, bgValue)
     sceneRef.current = scene
 
     // Camera
@@ -321,23 +320,12 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
     fillLight.position.set(-5, 5, -5)
     scene.add(fillLight)
 
-    // Grid helper
-    const grid = new THREE.GridHelper(10, 10, 0x444444, 0x333333)
-    grid.visible = showGrid
-    scene.add(grid)
-    gridRef.current = grid
-
-    // Axes helper
-    const axes = new THREE.AxesHelper(3)
-    axes.visible = showAxes
-    scene.add(axes)
-    axesRef.current = axes
-
     // Placeholder cube (will be replaced when mesh is loaded)
+    // Use modelDarkness for color: 0 = white, 1 = black
     const geometry = new THREE.BoxGeometry(1, 1, 1)
+    const meshColorValue = 1 - modelDarkness
     const material = new THREE.MeshStandardMaterial({
-      color: 0x4a9eff,
-      wireframe: wireframe,
+      color: new THREE.Color(meshColorValue, meshColorValue, meshColorValue),
     })
     const cube = new THREE.Mesh(geometry, material)
     cube.castShadow = true
@@ -353,7 +341,7 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
       renderer.render(scene, camera)
     }
     animate()
-  }, [showGrid, showAxes, wireframe])
+  }, [modelDarkness, backgroundDarkness])
 
   // Handle resize
   const handleResize = useCallback(() => {
@@ -415,29 +403,24 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
     }
   }, [initScene, handleResize, captureScreenshot, registerScreenshotCallback, unregisterScreenshotCallback])
 
-  // Update grid visibility
+  // Update background darkness
   useEffect(() => {
-    if (gridRef.current) {
-      gridRef.current.visible = showGrid
+    if (sceneRef.current) {
+      const bgValue = 1 - backgroundDarkness
+      sceneRef.current.background = new THREE.Color(bgValue, bgValue, bgValue)
     }
-  }, [showGrid])
+  }, [backgroundDarkness])
 
-  // Update axes visibility
-  useEffect(() => {
-    if (axesRef.current) {
-      axesRef.current.visible = showAxes
-    }
-  }, [showAxes])
-
-  // Update wireframe mode
+  // Update model darkness
   useEffect(() => {
     if (meshRef.current) {
       const material = meshRef.current.material as THREE.MeshStandardMaterial
       if (!material.vertexColors) {
-        material.wireframe = wireframe
+        const meshColorValue = 1 - modelDarkness
+        material.color.setRGB(meshColorValue, meshColorValue, meshColorValue)
       }
     }
-  }, [wireframe])
+  }, [modelDarkness])
 
   // Helper function to position mesh and fit camera
   const positionMeshAndCamera = useCallback(
@@ -503,9 +486,10 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
       ? createGeometryFromMeshData(activeMesh)
       : new THREE.BoxGeometry(1, 1, 1)
 
+    // Use modelDarkness for color: 0 = white, 1 = black
+    const meshColorValue = 1 - modelDarkness
     const material = new THREE.MeshStandardMaterial({
-      color: 0x4a9eff,
-      wireframe: wireframe,
+      color: new THREE.Color(meshColorValue, meshColorValue, meshColorValue),
     })
 
     const mesh = new THREE.Mesh(geometry, material)
@@ -520,7 +504,7 @@ export function MeshViewer({ className = '' }: MeshViewerProps) {
 
     sceneRef.current.add(mesh)
     meshRef.current = mesh
-  }, [activeMesh, wireframe, clearOverlay, positionMeshAndCamera])
+  }, [activeMesh, modelDarkness, clearOverlay, positionMeshAndCamera])
 
   // Update overlay when overlay mode or report changes
   useEffect(() => {

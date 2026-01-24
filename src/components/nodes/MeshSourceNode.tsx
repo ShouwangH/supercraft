@@ -3,7 +3,8 @@
 import { useRef, useCallback } from 'react'
 import type { NodeProps } from 'reactflow'
 import { useReactFlow } from 'reactflow'
-import type { MeshSourceNodeData } from '@/types/nodes'
+import type { MeshSourceNodeData, AppNode, AppEdge } from '@/types/nodes'
+import { NODE_TYPES } from '@/types/nodes'
 import { BaseNode } from './BaseNode'
 import { meshSourceDefinition } from '@/lib/nodes/registry'
 import { loadMeshFile, getAcceptedExtensions } from '@/lib/loaders/meshLoader'
@@ -12,8 +13,41 @@ import { getSampleDefinitions, generateSampleMesh } from '@/lib/samples/generate
 
 export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeData>) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { setNodes } = useReactFlow()
+  const { setNodes, addNodes, addEdges, getNode, getNodes } = useReactFlow()
   const addMesh = useMeshStore((state) => state.addMesh)
+
+  // Find a non-overlapping position for a new node
+  const findNonOverlappingPosition = useCallback((baseX: number, baseY: number) => {
+    const nodes = getNodes()
+    const nodeWidth = 250
+    const nodeHeight = 300
+    const padding = 50
+
+    let x = baseX
+    let y = baseY
+    let attempts = 0
+    const maxAttempts = 10
+
+    while (attempts < maxAttempts) {
+      const overlaps = nodes.some((n) => {
+        const dx = Math.abs(n.position.x - x)
+        const dy = Math.abs(n.position.y - y)
+        return dx < nodeWidth + padding && dy < nodeHeight + padding
+      })
+
+      if (!overlaps) break
+
+      if (attempts % 2 === 0) {
+        y += nodeHeight + padding
+      } else {
+        x += nodeWidth + padding
+        y = baseY
+      }
+      attempts++
+    }
+
+    return { x, y }
+  }, [getNodes])
 
   const updateNodeData = useCallback(
     (updates: Partial<MeshSourceNodeData>) => {
@@ -122,6 +156,40 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
 
   const sampleDefinitions = getSampleDefinitions()
 
+  // Handle creating ModelViewerNode
+  const handleGo = useCallback(() => {
+    if (!data.meshId) return
+
+    const thisNode = getNode(id) as AppNode
+    if (!thisNode) return
+
+    const position = findNonOverlappingPosition(thisNode.position.x + 350, thisNode.position.y)
+    const newNodeId = `model-viewer-${Date.now()}`
+    const newNode: AppNode = {
+      id: newNodeId,
+      type: NODE_TYPES.MODEL_VIEWER,
+      position,
+      data: {
+        label: '3D Model',
+        status: 'pass',
+        meshId: data.meshId,
+        meshName: data.meshName,
+        error: null,
+      },
+    }
+
+    const newEdge: AppEdge = {
+      id: `edge-${id}-${newNodeId}`,
+      source: id,
+      sourceHandle: 'mesh',
+      target: newNodeId,
+      targetHandle: 'mesh',
+    }
+
+    addNodes([newNode])
+    addEdges([newEdge])
+  }, [id, data.meshId, data.meshName, getNode, addNodes, addEdges, findNonOverlappingPosition])
+
   return (
     <BaseNode
       label={data.label}
@@ -170,7 +238,7 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
             <span className="text-red-400">{data.error}</span>
           ) : data.meshName ? (
             <div className="space-y-1">
-              <span className="text-green-400 block truncate" title={data.meshName}>
+              <span className="text-blue-400 block truncate" title={data.meshName}>
                 {data.meshName}
               </span>
             </div>
@@ -178,6 +246,15 @@ export function MeshSourceNode({ id, data, selected }: NodeProps<MeshSourceNodeD
             <span className="text-gray-400">No mesh loaded</span>
           )}
         </div>
+
+        {/* Go button - creates ModelViewerNode */}
+        <button
+          onClick={handleGo}
+          disabled={!data.meshId || data.status === 'running'}
+          className="w-full mt-2 px-3 py-1.5 text-xs font-medium bg-white text-neutral-900 hover:bg-blue-500 hover:text-white disabled:bg-neutral-700 disabled:text-gray-500 disabled:cursor-not-allowed rounded transition-colors"
+        >
+          Go
+        </button>
       </div>
     </BaseNode>
   )

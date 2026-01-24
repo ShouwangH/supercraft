@@ -5,18 +5,20 @@ describe('viewerStore', () => {
   beforeEach(() => {
     // Reset store to initial state
     useViewerStore.setState({
-      showGrid: true,
+      showGrid: false,
       showAxes: false,
       wireframe: false,
       overlayMode: 'none',
       overlayOpacity: 0.8,
+      modelDarkness: 0.3,
+      backgroundDarkness: 0.85,
       screenshotCallback: null,
     })
   })
 
   describe('initial state', () => {
-    it('has grid visible by default', () => {
-      expect(useViewerStore.getState().showGrid).toBe(true)
+    it('has grid hidden by default', () => {
+      expect(useViewerStore.getState().showGrid).toBe(false)
     })
 
     it('has axes hidden by default', () => {
@@ -160,6 +162,50 @@ describe('viewerStore', () => {
       useViewerStore.setState({ overlayMode: 'boundary_edges' })
       useViewerStore.getState().clearOverlay()
       expect(useViewerStore.getState().overlayMode).toBe('none')
+    })
+  })
+
+  describe('darkness settings', () => {
+    it('has default modelDarkness of 0.3', () => {
+      expect(useViewerStore.getState().modelDarkness).toBe(0.3)
+    })
+
+    it('has default backgroundDarkness of 0.85', () => {
+      expect(useViewerStore.getState().backgroundDarkness).toBe(0.85)
+    })
+  })
+
+  describe('setModelDarkness', () => {
+    it('sets model darkness within valid range', () => {
+      useViewerStore.getState().setModelDarkness(0.5)
+      expect(useViewerStore.getState().modelDarkness).toBe(0.5)
+    })
+
+    it('clamps model darkness to minimum 0', () => {
+      useViewerStore.getState().setModelDarkness(-0.5)
+      expect(useViewerStore.getState().modelDarkness).toBe(0)
+    })
+
+    it('clamps model darkness to maximum 1', () => {
+      useViewerStore.getState().setModelDarkness(1.5)
+      expect(useViewerStore.getState().modelDarkness).toBe(1)
+    })
+  })
+
+  describe('setBackgroundDarkness', () => {
+    it('sets background darkness within valid range', () => {
+      useViewerStore.getState().setBackgroundDarkness(0.5)
+      expect(useViewerStore.getState().backgroundDarkness).toBe(0.5)
+    })
+
+    it('clamps background darkness to minimum 0', () => {
+      useViewerStore.getState().setBackgroundDarkness(-0.5)
+      expect(useViewerStore.getState().backgroundDarkness).toBe(0)
+    })
+
+    it('clamps background darkness to maximum 1', () => {
+      useViewerStore.getState().setBackgroundDarkness(1.5)
+      expect(useViewerStore.getState().backgroundDarkness).toBe(1)
     })
   })
 

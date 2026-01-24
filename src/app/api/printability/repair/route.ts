@@ -6,6 +6,7 @@ import { removeFloaters } from '@/lib/repair/removeFloaters'
 import { meshCleanup } from '@/lib/repair/meshCleanup'
 import { autoOrient } from '@/lib/repair/autoOrient'
 import { watertightRemesh } from '@/lib/repair/watertightRemesh'
+import { csgUnion } from '@/lib/repair/csgUnion'
 
 /**
  * Converts request mesh data to internal MeshData format
@@ -85,6 +86,7 @@ function validateRequest(body: unknown): { valid: boolean; error?: string; data?
     'mesh_cleanup',
     'auto_orient',
     'watertight_remesh',
+    'csg_union',
   ]
 
   if (!validRecipeTypes.includes(request.recipeType as FixOperationType)) {
@@ -161,11 +163,21 @@ export async function POST(request: NextRequest): Promise<NextResponse<RepairRes
 
     switch (recipeType) {
       case 'remove_floaters': {
+        const keepOnlyLargest = (params?.keepOnlyLargest as boolean) ?? false
         const floaterResult = removeFloaters(meshData, {
           thresholdPercent: (params?.thresholdPercent as number) ?? 5,
+          keepOnlyLargest,
         })
         repairedMesh = floaterResult.mesh
-        result = floaterResult.result
+        result = {
+          ...floaterResult.result,
+          debug: {
+            paramsReceived: params,
+            keepOnlyLargest,
+            trianglesBefore: meshData.triangleCount,
+            trianglesAfter: floaterResult.mesh.triangleCount,
+          },
+        }
         break
       }
 
@@ -195,6 +207,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<RepairRes
         })
         repairedMesh = remeshResult.mesh
         result = remeshResult.result
+        break
+      }
+
+      case 'csg_union': {
+        const unionResult = csgUnion(meshData, {
+          debug: (params?.debug as boolean) ?? false,
+        })
+        repairedMesh = unionResult.mesh
+        result = unionResult.result
         break
       }
 

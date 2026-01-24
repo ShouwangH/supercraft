@@ -6,11 +6,13 @@
 
 import type { MeshData } from '@/types/mesh'
 import type { FixResult } from '@/types/fixPlan'
-import { findConnectedComponentsFromIndices, getFacesInComponent } from '@/lib/analysis/components'
+import { findConnectedComponentsFromIndices } from '@/lib/analysis/components'
 
 export interface RemoveFloatersOptions {
   /** Threshold percentage - components below this % of total faces are removed */
   thresholdPercent?: number
+  /** If true, keeps only the largest component and removes all others */
+  keepOnlyLargest?: boolean
 }
 
 /**
@@ -24,13 +26,19 @@ export function removeFloaters(
   mesh: MeshData,
   options: RemoveFloatersOptions = {}
 ): { mesh: MeshData; result: FixResult } {
-  const { thresholdPercent = 5 } = options
+  const { thresholdPercent = 5, keepOnlyLargest = false } = options
+
+  console.log('[FLOATERS] options:', { thresholdPercent, keepOnlyLargest })
 
   // Find connected components
   const components = findConnectedComponentsFromIndices(mesh.indices, thresholdPercent)
 
-  // If no floaters, return original mesh
-  if (components.floaterIndices.length === 0) {
+  console.log('[FLOATERS] componentCount:', components.componentCount)
+  console.log('[FLOATERS] mainComponentIndex:', components.mainComponentIndex)
+  console.log('[FLOATERS] componentSizes:', components.componentSizes)
+
+  // If only one component, nothing to remove
+  if (components.componentCount <= 1) {
     return {
       mesh,
       result: {
@@ -44,17 +52,60 @@ export function removeFloaters(
     }
   }
 
-  // Create set of floater component IDs for fast lookup
-  const floaterSet = new Set(components.floaterIndices)
+  // Determine which components to keep
+  let componentsToRemove: Set<number>
 
-  // Collect faces to keep (those not in floater components)
+  if (keepOnlyLargest) {
+    // Keep only the largest component, remove all others
+    console.log('[FLOATERS] Using keepOnlyLargest mode')
+    componentsToRemove = new Set<number>()
+    for (let i = 0; i < components.componentCount; i++) {
+      if (i !== components.mainComponentIndex) {
+        componentsToRemove.add(i)
+      }
+    }
+    console.log('[FLOATERS] componentsToRemove:', Array.from(componentsToRemove))
+  } else {
+    // Use threshold-based removal (original behavior)
+    if (components.floaterIndices.length === 0) {
+      return {
+        mesh,
+        result: {
+          success: true,
+          stats: {
+            trianglesRemoved: 0,
+            verticesRemoved: 0,
+            componentsRemoved: 0,
+          },
+        },
+      }
+    }
+    componentsToRemove = new Set(components.floaterIndices)
+  }
+
+  // Collect faces to keep (those not in components to remove)
   const facesToKeep: number[] = []
   const faceCount = mesh.indices.length / 3
 
   for (let f = 0; f < faceCount; f++) {
     const componentId = components.componentIdPerFace[f]
-    if (!floaterSet.has(componentId)) {
+    if (!componentsToRemove.has(componentId)) {
       facesToKeep.push(f)
+    }
+  }
+
+  // If nothing to remove, return original
+  if (facesToKeep.length === faceCount) {
+    return {
+      mesh,
+      result: {
+        success: true,
+        stats: {
+          trianglesRemoved: 0,
+          verticesRemoved: 0,
+          componentsRemoved: 0,
+        },
+      },
     }
   }
 
@@ -144,7 +195,7 @@ export function removeFloaters(
       stats: {
         trianglesRemoved,
         verticesRemoved,
-        componentsRemoved: components.floaterIndices.length,
+        componentsRemoved: componentsToRemove.size,
       },
     },
   }

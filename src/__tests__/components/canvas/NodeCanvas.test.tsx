@@ -18,11 +18,12 @@ describe('NodeCanvas', () => {
 })
 
 describe('createInitialNodes', () => {
-  it('returns expected node structure', () => {
+  it('returns only mesh-source node initially', () => {
     const { nodes, edges } = createInitialNodes()
 
-    expect(nodes).toHaveLength(3)
-    expect(edges).toHaveLength(3)
+    // Only MeshSourceNode at start - other nodes created dynamically
+    expect(nodes).toHaveLength(1)
+    expect(edges).toHaveLength(0)
   })
 
   it('creates mesh-source node', () => {
@@ -34,43 +35,14 @@ describe('createInitialNodes', () => {
     expect(meshSource?.data.status).toBe('idle')
   })
 
-  it('creates printability-report node', () => {
+  it('mesh-source node has correct initial data', () => {
     const { nodes } = createInitialNodes()
-    const report = nodes.find((n) => n.type === 'printability-report')
+    const meshSource = nodes[0]
 
-    expect(report).toBeDefined()
-    expect(report?.data.label).toBe('Printability Report')
-    expect(report?.data.status).toBe('idle')
-  })
-
-  it('creates suggested-fixes node', () => {
-    const { nodes } = createInitialNodes()
-    const fixes = nodes.find((n) => n.type === 'suggested-fixes')
-
-    expect(fixes).toBeDefined()
-    expect(fixes?.data.label).toBe('Suggested Fixes')
-    expect(fixes?.data.status).toBe('idle')
-  })
-
-  it('creates edges connecting nodes correctly', () => {
-    const { edges } = createInitialNodes()
-
-    // Mesh source -> Printability report (mesh)
-    const e1 = edges.find((e) => e.source === 'mesh-source-1' && e.target === 'printability-report-1')
-    expect(e1).toBeDefined()
-    expect(e1?.sourceHandle).toBe('mesh')
-    expect(e1?.targetHandle).toBe('mesh')
-
-    // Mesh source -> Suggested fixes (mesh)
-    const e2 = edges.find((e) => e.source === 'mesh-source-1' && e.target === 'suggested-fixes-1')
-    expect(e2).toBeDefined()
-    expect(e2?.sourceHandle).toBe('mesh')
-    expect(e2?.targetHandle).toBe('mesh')
-
-    // Printability report -> Suggested fixes (report)
-    const e3 = edges.find((e) => e.source === 'printability-report-1' && e.target === 'suggested-fixes-1')
-    expect(e3).toBeDefined()
-    expect(e3?.sourceHandle).toBe('report')
-    expect(e3?.targetHandle).toBe('report')
+    expect(meshSource.id).toBe('mesh-source-1')
+    expect(meshSource.type).toBe('mesh-source')
+    expect(meshSource.data.meshId).toBeNull()
+    expect(meshSource.data.meshName).toBeNull()
+    expect(meshSource.data.error).toBeNull()
   })
 })
